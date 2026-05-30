@@ -1,13 +1,44 @@
 {
   "generators": {
-    "address": 1,
+    "address": 2,
     "nonce": 0
   },
   "auth": [
     [],
-    [],
-    [],
-    [],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "function_name": "create_campaign",
+              "args": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "string": "Limited"
+                },
+                {
+                  "string": "percentage"
+                },
+                {
+                  "u64": 1000
+                },
+                {
+                  "u32": 2
+                },
+                {
+                  "u64": 9999999999
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
     []
   ],
   "ledger": {
@@ -25,7 +56,14 @@
           "contract_data": {
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
             "key": {
-              "string": "PK486CZQ"
+              "vec": [
+                {
+                  "symbol": "Campaign"
+                },
+                {
+                  "u64": 1
+                }
+              ]
             },
             "durability": "persistent"
           }
@@ -38,92 +76,88 @@
                 "ext": "v0",
                 "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
                 "key": {
-                  "string": "PK486CZQ"
-                },
-                "durability": "persistent",
-                "val": {
                   "vec": [
                     {
-                      "symbol": "Redeemed"
+                      "symbol": "Campaign"
+                    },
+                    {
+                      "u64": 1
                     }
                   ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          4095
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "string": "REF-20260330-0001"
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "string": "REF-20260330-0001"
                 },
                 "durability": "persistent",
                 "val": {
                   "map": [
                     {
                       "key": {
-                        "symbol": "bot_id"
+                        "symbol": "burned"
                       },
                       "val": {
-                        "u64": 2
+                        "u32": 0
                       }
                     },
                     {
                       "key": {
-                        "symbol": "campaign"
+                        "symbol": "discount_type"
                       },
                       "val": {
-                        "string": "Cafe gratis"
+                        "string": "percentage"
                       }
                     },
                     {
                       "key": {
-                        "symbol": "coupon_code"
+                        "symbol": "discount_value"
                       },
                       "val": {
-                        "string": "PK486CZQ"
+                        "u64": 1000
                       }
                     },
                     {
                       "key": {
-                        "symbol": "redeemer"
+                        "symbol": "id"
                       },
                       "val": {
-                        "string": "Fabian"
+                        "u64": 1
                       }
                     },
                     {
                       "key": {
-                        "symbol": "reference"
+                        "symbol": "minted"
                       },
                       "val": {
-                        "string": "REF-20260330-0001"
+                        "u32": 0
                       }
                     },
                     {
                       "key": {
-                        "symbol": "timestamp"
+                        "symbol": "name"
                       },
                       "val": {
-                        "u64": 0
+                        "string": "Limited"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "owner"
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "total_supply"
+                      },
+                      "val": {
+                        "u32": 2
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "valid_until"
+                      },
+                      "val": {
+                        "u64": 9999999999
                       }
                     }
                   ]
@@ -132,7 +166,7 @@
             },
             "ext": "v0"
           },
-          4095
+          2678400
         ]
       ],
       [
@@ -160,7 +194,7 @@
                     "storage": [
                       {
                         "key": {
-                          "symbol": "counter"
+                          "symbol": "camp_ctr"
                         },
                         "val": {
                           "u64": 1
@@ -173,7 +207,40 @@
             },
             "ext": "v0"
           },
-          4095
+          2678400
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+            "key": {
+              "ledger_key_nonce": {
+                "nonce": 801925984706572462
+              }
+            },
+            "durability": "temporary"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+                "key": {
+                  "ledger_key_nonce": {
+                    "nonce": 801925984706572462
+                  }
+                },
+                "durability": "temporary",
+                "val": "void"
+              }
+            },
+            "ext": "v0"
+          },
+          6311999
         ]
       ],
       [
@@ -194,7 +261,7 @@
             },
             "ext": "v0"
           },
-          4095
+          2678400
         ]
       ]
     ]

@@ -1,6 +1,6 @@
 # Sorodeal Protocol Spec (draft)
 
-> Status: **draft / design target.** Supersedes the donor contract in `contracts/coupon-ledger/`, which implements an older single-admin subset.
+> Status: **draft / design target.** The reference contract in `contracts/coupon-ledger/` now implements the permissionless **Burn** profile of this spec (ADR-002/005); the async **Tally** profile remains design-only.
 
 ## 1. Overview
 
@@ -48,7 +48,7 @@ The cardinality determines the on-chain interaction pattern.
 For **unique** codes. Each redemption is an on-chain transaction that marks the token burned. The contract enforces single-use (`AlreadyRedeemed`) and supply caps at the protocol level. Real-time, low-volume, high-value-per-item.
 
 - **Why on-chain, honestly:** double-use prevention at the point of redemption + supply integrity (cannot oversell seats). These are genuine, real-time guarantees.
-- The donor contract (`contracts/coupon-ledger/`) already implements this path: `create_campaign` → `mint_batch` → `redeem` (burn) → `verify`.
+- The reference contract (`contracts/coupon-ledger/`) implements this path, permissionless and PII-free: `create_campaign` → `issue_unique` → `redeem_unique(redeemer_ref_hash)` → `verify`. Each campaign is owned by its creator; the owner or an explicit delegate authorizes redemptions (ADR-007).
 
 ### 3.2 Tally (asynchronous)
 
@@ -79,9 +79,14 @@ get_campaign(campaign_id: u64) -> Campaign
 campaign_stats(campaign_id: u64) -> CampaignStats
 
 // Burn profile (unique)
-issue_unique(owner, campaign_id, codes: Vec<String>) -> Vec<u64>       // require_auth(owner)
-redeem_unique(authorizer, code, redeemer_ref_hash) -> Receipt          // require_auth; single-use
+issue_unique(owner, campaign_id, codes: Vec<String>) -> Vec<u64>       // require_auth(owner) — owner only
+redeem_unique(authorizer, code, redeemer_ref_hash) -> Receipt          // require_auth; owner or delegate; single-use
 verify(code) -> CodeStatus                                             // public, no auth
+
+// Delegation (Burn) — owner grants/revokes operator redemption rights (ADR-007)
+add_delegate(owner, campaign_id, delegate: Address)                    // require_auth(owner)
+remove_delegate(owner, campaign_id, delegate: Address)                 // require_auth(owner)
+is_delegate(campaign_id, who: Address) -> bool                         // public, no auth
 
 // Tally profile (shared)
 register_shared(owner, campaign_id, code, policy, attributed_to: Option<Address>)  // require_auth(owner)

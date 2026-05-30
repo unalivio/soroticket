@@ -42,7 +42,7 @@ sorodeal/
 ├── README.md
 ├── CLAUDE.md                 # orientation for AI sessions — read this first
 ├── contracts/
-│   └── coupon-ledger/        # donor Soroban contract (single-admin PROTOTYPE — to be redesigned permissionless)
+│   └── coupon-ledger/        # reference Soroban contract — permissionless Burn profile (ADR-002/005); Tally is next
 │       ├── src/lib.rs
 │       ├── Cargo.toml
 │       └── test_snapshots/

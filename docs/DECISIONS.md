@@ -34,6 +34,11 @@ Short ADRs capturing the "why." Newest decisions append at the bottom.
 **Decision:** **Sorodeal** (Soroban + deal).
 **Consequences:** Repo, package, and SEP naming follow. Still pursue a candidate SEP for "standard" legitimacy regardless of brand name.
 
+## ADR-007 — Authorization granularity: owner-only issuance, owner-or-delegate redemption
+**Context:** ADR-002 makes campaigns owner-authorized "with explicit delegates" but does not say which operations a delegate may perform. Issuing codes creates value and changes the supply cap; redemption is the routine act done "at the door" (POS staff, many devices).
+**Decision:** In the reference contract, `create_campaign`, `issue_unique`, and delegate management (`add_delegate`/`remove_delegate`) require the campaign **owner**. `redeem_unique` accepts the **owner or any registered delegate** (per-campaign). The donor's global `ADMIN`/`initialize`/`require_admin` are removed entirely — there is no privileged singleton. Redemptions carry only a salted `redeemer_ref_hash` (ADR-005); the on-chain anchor is the ledger sequence, not a global counter.
+**Consequences:** Operators can be granted and revoked without sharing the owner key, while supply creation stays owner-gated. This realizes ADR-002/005 for the Burn profile. The async Tally profile (ADR-003) and USDC settlement (ADR-004) are not yet in the contract — they are the next milestone.
+
 ---
 
 ### TODO / unresolved

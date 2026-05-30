@@ -18,16 +18,16 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "string": "Promo"
+                  "string": "Cafe Gratis"
                 },
                 {
-                  "string": "fixed_amount"
+                  "string": "percentage"
                 },
                 {
-                  "u64": 500
+                  "u64": 10000
                 },
                 {
-                  "u32": 10
+                  "u32": 100
                 },
                 {
                   "u64": 9999999999
@@ -39,6 +39,8 @@
         }
       ]
     ],
+    [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
@@ -57,7 +59,10 @@
                 {
                   "vec": [
                     {
-                      "string": "TESTCODE"
+                      "string": "PK486CZQ"
+                    },
+                    {
+                      "string": "MLSJXKVM"
                     }
                   ]
                 }
@@ -68,6 +73,8 @@
         }
       ]
     ],
+    [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
@@ -81,10 +88,10 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "string": "TESTCODE"
+                  "string": "PK486CZQ"
                 },
                 {
-                  "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                  "bytes": "0707070707070707070707070707070707070707070707070707070707070707"
                 }
               ]
             }
@@ -93,6 +100,9 @@
         }
       ]
     ],
+    [],
+    [],
+    [],
     []
   ],
   "ledger": {
@@ -155,7 +165,7 @@
                         "symbol": "discount_type"
                       },
                       "val": {
-                        "string": "fixed_amount"
+                        "string": "percentage"
                       }
                     },
                     {
@@ -163,7 +173,7 @@
                         "symbol": "discount_value"
                       },
                       "val": {
-                        "u64": 500
+                        "u64": 10000
                       }
                     },
                     {
@@ -179,7 +189,7 @@
                         "symbol": "minted"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 2
                       }
                     },
                     {
@@ -187,7 +197,7 @@
                         "symbol": "name"
                       },
                       "val": {
-                        "string": "Promo"
+                        "string": "Cafe Gratis"
                       }
                     },
                     {
@@ -203,7 +213,7 @@
                         "symbol": "total_supply"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 100
                       }
                     },
                     {
@@ -233,7 +243,7 @@
                   "symbol": "CodeIndex"
                 },
                 {
-                  "string": "TESTCODE"
+                  "string": "MLSJXKVM"
                 }
               ]
             },
@@ -253,7 +263,52 @@
                       "symbol": "CodeIndex"
                     },
                     {
-                      "string": "TESTCODE"
+                      "string": "MLSJXKVM"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "u64": 2
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          2678400
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "CodeIndex"
+                },
+                {
+                  "string": "PK486CZQ"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "CodeIndex"
+                    },
+                    {
+                      "string": "PK486CZQ"
                     }
                   ]
                 },
@@ -326,7 +381,7 @@
                         "symbol": "code"
                       },
                       "val": {
-                        "string": "TESTCODE"
+                        "string": "PK486CZQ"
                       }
                     },
                     {
@@ -350,7 +405,7 @@
                         "symbol": "redeemer_ref"
                       },
                       "val": {
-                        "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                        "bytes": "0707070707070707070707070707070707070707070707070707070707070707"
                       }
                     },
                     {
@@ -359,6 +414,108 @@
                       },
                       "val": {
                         "u64": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          2678400
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Token"
+                },
+                {
+                  "u64": 2
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Token"
+                    },
+                    {
+                      "u64": 2
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "burned_at"
+                      },
+                      "val": {
+                        "u64": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "campaign_id"
+                      },
+                      "val": {
+                        "u64": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "code"
+                      },
+                      "val": {
+                        "string": "MLSJXKVM"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "is_burned"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "minted_at"
+                      },
+                      "val": {
+                        "u64": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "redeemer_ref"
+                      },
+                      "val": {
+                        "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "token_id"
+                      },
+                      "val": {
+                        "u64": 2
                       }
                     }
                   ]
@@ -406,7 +563,7 @@
                           "symbol": "tok_ctr"
                         },
                         "val": {
-                          "u64": 1
+                          "u64": 2
                         }
                       }
                     ]
