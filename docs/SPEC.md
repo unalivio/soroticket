@@ -1,0 +1,110 @@
+# Sorodeal Protocol Spec (draft)
+
+> Status: **draft / design target.** Supersedes the donor contract in `contracts/coupon-ledger/`, which implements an older single-admin subset.
+
+## 1. Overview
+
+Sorodeal defines how to **issue**, **redeem**, **attribute**, and **settle** redeemable codes ("deals") on Stellar Soroban. A deal can be a one-time unique token (a ticket) or a shared multi-use code (a promo). Redemptions can be credited to a creator/referrer and trigger automatic payout.
+
+The protocol is **permissionless**: any account can create a campaign and issue codes from its own keypair. There is no privileged operator.
+
+## 2. Core primitive
+
+Four nouns:
+
+```
+Campaign ──< Code ──< Redemption ──> Settlement
+```
+
+- **Campaign** — the terms of a promotion: owner, reward, validity window, supply/cap, redemption profile.
+- **Code** — a redeemable string issued under a campaign, with an issuance shape and a redemption policy. May carry an attribution target (a creator/referrer Address).
+- **Redemption** — an event consuming a code, producing a receipt.
+- **Settlement** — optional value transfer triggered by redemptions (e.g., pay the attributed creator in USDC).
+
+### The three policy axes
+
+Every code is described by:
+
+1. **Cardinality** — `unique` (1 code = 1 redemption) or `shared` (1 code = N redemptions, up to a cap).
+2. **Attribution** — none, or an `Address` credited for each redemption (creator, affiliate, referrer).
+3. **Per-redeemer limits** — once-per-user, geofence, time window, optional KYC.
+
+### Use-case mapping
+
+| Use case | Cardinality | Attribution | Per-user | Profile |
+|---|---|---|---|---|
+| Delivery promo `SUPERBOWL10` | shared | none | once/user | Tally |
+| Creator code `ROBERTOX` | shared | creator | once/user | Tally + payout |
+| Referral (P2P) | shared (1/user) | referrer | anti-abuse | Tally + payout |
+| Event ticket | unique | optional | transferable? | Burn |
+| Geo-drop | unique/capped | optional | geofence + window | Burn |
+
+## 3. Redemption profiles
+
+The cardinality determines the on-chain interaction pattern.
+
+### 3.1 Burn (synchronous)
+
+For **unique** codes. Each redemption is an on-chain transaction that marks the token burned. The contract enforces single-use (`AlreadyRedeemed`) and supply caps at the protocol level. Real-time, low-volume, high-value-per-item.
+
+- **Why on-chain, honestly:** double-use prevention at the point of redemption + supply integrity (cannot oversell seats). These are genuine, real-time guarantees.
+- The donor contract (`contracts/coupon-ledger/`) already implements this path: `create_campaign` → `mint_batch` → `redeem` (burn) → `verify`.
+
+### 3.2 Tally (asynchronous)
+
+For **shared** codes at scale (delivery, UGC). Putting every redemption on-chain synchronously is wrong here — too slow/expensive, and there is no double-spend to prevent (shared codes are meant to be reused).
+
+Instead:
+
+1. Redemptions happen off-chain on the integrator's hot path (fast, private). Each produces a **signed receipt** `{code, redeemer_ref_hash, attributed_to, ts, nonce}`.
+2. Periodically (per epoch), the campaign owner commits on-chain: `commit_tally(campaign_id, code, period, count, merkle_root, per_attribution_counts)`.
+3. Anyone can audit a claimed count against the committed `merkle_root` by checking inclusion of the underlying receipts. **The tally is verifiable without trusting the operator** — this is what makes attribution trustless.
+
+- **Why on-chain, honestly:** trustless redemption counts + attribution, and a settlement trigger. NOT double-spend.
+
+## 4. Attribution & settlement
+
+- A code may set `attributed_to: Address`. Tally commitments include per-attribution counts.
+- **Settlement** (optional module): given committed per-attribution counts and a payout rate, disburse USDC to attributed creators/referrers — SDP-style. Economical only because Stellar fees are sub-cent, so paying fractions of a cent per conversion is viable.
+- Trust model: receipts are signed and Merkle-anchored, so a creator can independently verify their own number. Disputes resolve against the committed leaves.
+
+## 5. Proposed contract interface (permissionless)
+
+> Sketch — replaces the donor's global-admin model. `owner` authenticates via `require_auth`; campaigns are owned by their creator, not a global admin.
+
+```
+// Campaigns — anyone can create from their own account
+create_campaign(owner: Address, terms: CampaignTerms) -> u64           // require_auth(owner)
+get_campaign(campaign_id: u64) -> Campaign
+campaign_stats(campaign_id: u64) -> CampaignStats
+
+// Burn profile (unique)
+issue_unique(owner, campaign_id, codes: Vec<String>) -> Vec<u64>       // require_auth(owner)
+redeem_unique(authorizer, code, redeemer_ref_hash) -> Receipt          // require_auth; single-use
+verify(code) -> CodeStatus                                             // public, no auth
+
+// Tally profile (shared)
+register_shared(owner, campaign_id, code, policy, attributed_to: Option<Address>)  // require_auth(owner)
+commit_tally(owner, campaign_id, code, period, count, merkle_root)     // require_auth(owner)
+get_tally(campaign_id, code, period) -> TallyCommitment
+
+// Settlement (optional module)
+settle(campaign_id, period, asset, rate) -> Vec<Payout>                // pays attributed_to addresses
+```
+
+### Data structures (target)
+
+- `CampaignTerms { name, reward_type, reward_value, profile, supply_or_cap, valid_from, valid_until }`
+- `Code { campaign_id, code, cardinality, policy, attributed_to }`
+- `Receipt { code, redeemer_ref_hash, attributed_to, ts, tx_or_nonce }`
+- `TallyCommitment { period, count, merkle_root, per_attribution: Map<Address,u32> }`
+
+**Privacy:** redeemer identity is only ever a salted hash on-chain. No plaintext PII (the donor contract violates this — see DECISIONS).
+
+## 6. Open questions
+
+- Geofence enforcement is inherently off-chain/oracle — the *policy* is declared on-chain, but GPS cannot be trusted on-chain. How much to standardize?
+- Transferable tickets (bearer) vs bound-to-redeemer — separate extension?
+- Loyalty / stamp-cards (accumulation, not redemption) — out of core, roadmap extension.
+- Epoch length and who pays the `commit_tally` fee in the permissionless model.
+- Exact SEP scope: core (Campaign/Code/Redemption) as the SEP, settlement as a companion?

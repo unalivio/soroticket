@@ -1,0 +1,17 @@
+# Rust / Soroban build artifacts
+target/
+**/target/
+*.wasm
+.cargo-lock
+
+# Secrets / env
+.env
+*.env
+!*.env.example
+secrets/
+*.key
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
