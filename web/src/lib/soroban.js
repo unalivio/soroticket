@@ -199,9 +199,11 @@ const scMapAddrU32 = (pairs) =>
     (pairs || []).map(([addr, n]) => new xdr.ScMapEntry({ key: scAddr(addr), val: scU32(n) }))
   );
 
-async function registerShared(from, campaignId, code, attributedTo) {
+async function registerShared(from, campaignId, code, attributedTo, payoutToken, payoutRate) {
+  // payout token + rate are fixed at registration (immutable) — settle uses them
   return await write(from, "register_shared", [
-    scAddr(from), scU64(campaignId), scStr(code), scOptAddr(attributedTo),
+    scAddr(from), scU64(campaignId), scStr(code),
+    scOptAddr(attributedTo), scOptAddr(payoutToken), scI128(payoutRate || 0),
   ]);
 }
 async function getShared(campaignId, code) {
@@ -217,13 +219,13 @@ async function commitTally(from, campaignId, code, period, count, merkleHex, per
 async function getTally(campaignId, code, period) {
   return toNative(await read("get_tally", [scU64(campaignId), scStr(code), scU64(period)]));
 }
-async function computePayouts(campaignId, code, period, rate) {
-  return toNative(await read("compute_payouts", [scU64(campaignId), scStr(code), scU64(period), scI128(rate)]));
+async function computePayouts(campaignId, code, period) {
+  // rate comes from the registered shared code (no arbitrary rate)
+  return toNative(await read("compute_payouts", [scU64(campaignId), scStr(code), scU64(period)]));
 }
-async function settle(from, campaignId, code, period, token, rate) {
-  return await write(from, "settle", [
-    scAddr(from), scU64(campaignId), scStr(code), scU64(period), scAddr(token), scI128(rate),
-  ]);
+async function settle(from, campaignId, code, period) {
+  // token + rate are read from the shared code on-chain (immutable)
+  return await write(from, "settle", [scAddr(from), scU64(campaignId), scStr(code), scU64(period)]);
 }
 
 window.SDK = {

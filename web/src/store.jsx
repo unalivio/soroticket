@@ -296,15 +296,23 @@ function AppProvider({ children }) {
   }, [invoke]);
 
   /* ── TALLY (shared codes) — ADR-003/004/011 ───────────────── */
-  const registerShared = useCallback(async (campaignId, code, attributedTo) => {
+  const registerShared = useCallback(async (campaignId, code, attributedTo, payoutToken, payoutRate) => {
     return invoke("register_shared", "owner",
-      { owner: wallet?.address, campaign_id: Number(campaignId), code, attributed_to: attributedTo || null },
+      { owner: wallet?.address, campaign_id: Number(campaignId), code, attributed_to: attributedTo || null, payout_token: payoutToken || null, payout_rate: Number(payoutRate) || 0 },
       async () => {
         requireWallet();
-        const { tx, seq } = await sdk().registerShared(wallet.address, Number(campaignId), code, attributedTo || null);
+        const { tx, seq } = await sdk().registerShared(wallet.address, Number(campaignId), code, attributedTo || null, payoutToken || null, Number(payoutRate) || 0);
         return { result: { ok: true }, tx, seq };
       });
   }, [wallet, invoke]);
+
+  const getShared = useCallback(async (campaignId, code) => {
+    return invoke("get_shared", "public", { campaign_id: Number(campaignId), code },
+      async () => {
+        const sh = await sdk().getShared(Number(campaignId), code);
+        return { result: { attributed_to: sh.attributed_to ? String(sh.attributed_to) : null, payout_token: sh.payout_token ? String(sh.payout_token) : null, payout_rate: Number(sh.payout_rate) } };
+      }, { read: true });
+  }, [invoke]);
 
   const commitTally = useCallback(async (campaignId, code, period, count, merkleHex, perAttribution) => {
     return invoke("commit_tally", "owner",
@@ -327,21 +335,21 @@ function AppProvider({ children }) {
       }, { read: true });
   }, [invoke]);
 
-  const computePayouts = useCallback(async (campaignId, code, period, rate) => {
-    return invoke("compute_payouts", "public", { campaign_id: Number(campaignId), code, period: Number(period), rate: Number(rate) },
+  const computePayouts = useCallback(async (campaignId, code, period) => {
+    return invoke("compute_payouts", "public", { campaign_id: Number(campaignId), code, period: Number(period) },
       async () => {
-        const list = await sdk().computePayouts(Number(campaignId), code, Number(period), Number(rate));
+        const list = await sdk().computePayouts(Number(campaignId), code, Number(period));
         return { result: (list || []).map((p) => ({ to: String(p.to), amount: Number(p.amount) })) };
       }, { read: true });
   }, [invoke]);
 
-  const settle = useCallback(async (campaignId, code, period, token, rate) => {
+  const settle = useCallback(async (campaignId, code, period) => {
     return invoke("settle", "owner",
-      { owner: wallet?.address, campaign_id: Number(campaignId), code, period: Number(period), token, rate: Number(rate) },
+      { owner: wallet?.address, campaign_id: Number(campaignId), code, period: Number(period) },
       async () => {
         requireWallet();
         const s = sdk();
-        const { retval, tx, seq } = await s.settle(wallet.address, Number(campaignId), code, Number(period), token, Number(rate));
+        const { retval, tx, seq } = await s.settle(wallet.address, Number(campaignId), code, Number(period));
         const payouts = (s.toNative(retval) || []).map((p) => ({ to: String(p.to), amount: Number(p.amount) }));
         return { result: { payouts }, tx, seq };
       });
@@ -352,7 +360,7 @@ function AppProvider({ children }) {
     state, log, toasts, toast, dismissToast, pushLog, clearLog, highlight,
     createCampaign, issueCodes, redeem, verify, campaignStats,
     addDelegate, removeDelegate, isDelegate,
-    registerShared, commitTally, getTally, computePayouts, settle,
+    registerShared, getShared, commitTally, getTally, computePayouts, settle,
   };
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }

@@ -8,7 +8,7 @@
     network: "testnet",
     passphrase: "Test SDF Network ; September 2015",
     rpc: "https://soroban-testnet.stellar.org",
-    contractId: "CAGBCE2ETELUJM2CCPMMTTP6XEZQN26LD7TMURRA62UQY7WT7WQ2LZBR",
+    contractId: "CCS7VFN2Z2UPLEU6RE4WBHSCVWPS752WRHKSVMLUTCQOS4PEJ36JO4SU",
     ownerWallet: "GCIJM67CD2U6XPI5GYS5VYSNIYOKLH7DZ4XA3W45PID7DYCRYFTRDSV6",
     explorer: "https://stellar.expert/explorer/testnet",
   };
@@ -126,6 +126,8 @@
     TallyNotFound:     { code: 15, title: "Tally not found",      msg: "No tally has been committed for that code and period." },
     AlreadySettled:    { code: 16, title: "Already settled",      msg: "This tally period was already settled." },
     InvalidTally:      { code: 17, title: "Invalid tally",        msg: "Per-attribution counts cannot exceed the committed total count." },
+    InvalidSettlement: { code: 18, title: "Invalid settlement",   msg: "Payout rate must be > 0, the code must have a settlement token configured, and amounts must not overflow." },
+    AttributionMismatch: { code: 19, title: "Attribution mismatch", msg: "This code credits a single registered creator/referrer — the tally can only attribute to that address." },
   };
 
   // ═══════════════════════════════════════════════════════════
