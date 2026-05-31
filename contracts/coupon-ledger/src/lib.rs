@@ -692,16 +692,33 @@ impl CouponLedger {
         payout_rate: i128,
     ) -> Result<(), Error> {
         owner.require_auth();
-        Self::require_owner(&env, campaign_id, &owner)?;
+        let camp: Campaign = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Campaign(campaign_id))
+            .ok_or(Error::CampaignNotFound)?;
+        if owner != camp.owner {
+            return Err(Error::Unauthorized);
+        }
+        if env.ledger().timestamp() > camp.valid_until {
+            return Err(Error::CampaignExpired); // no registering under a dead campaign
+        }
         if code.is_empty() {
             return Err(Error::InvalidCode);
         }
         if code.len() > MAX_CODE_LEN {
             return Err(Error::CodeTooLong);
         }
-        // Settlement config is fixed at registration (immutable): if a payout
-        // token is set, the rate must be positive. None ⇒ count-only (no payout).
-        if payout_token.is_some() && payout_rate <= 0 {
+        // Immutable settlement config with consistent invariants:
+        //   payout_token set ⇔ rate > 0;  no attribution ⇒ no payout token.
+        if attributed_to.is_none() && payout_token.is_some() {
+            return Err(Error::InvalidSettlement);
+        }
+        if payout_token.is_some() {
+            if payout_rate <= 0 {
+                return Err(Error::InvalidSettlement);
+            }
+        } else if payout_rate != 0 {
             return Err(Error::InvalidSettlement);
         }
         let key = DataKey::Shared(campaign_id, code.clone());
@@ -762,9 +779,11 @@ impl CouponLedger {
         if env.storage().persistent().has(&key) {
             return Err(Error::PeriodCommitted); // append-only
         }
-        // Attribution counts cannot exceed the total, and — if the code has a
-        // single registered creator/referrer — may ONLY credit that address
-        // (so an owner can't register for A then pay B).
+        // Attribution rules: a code with a registered creator may credit ONLY
+        // that address; an unattributed code may not carry per-attribution at all.
+        if shared.attributed_to.is_none() && !per_attribution.is_empty() {
+            return Err(Error::AttributionMismatch);
+        }
         let mut attributed: u32 = 0;
         for (addr, v) in per_attribution.iter() {
             if let Some(target) = shared.attributed_to.clone() {
@@ -901,6 +920,43 @@ impl CouponLedger {
             (campaign_id, period, token, shared.payout_rate),
         );
         Ok(out)
+    }
+
+    /// Re-extend the storage TTL of a shared code and the given periods' tally +
+    /// settlement entries, for long-lived auditability. Public — anyone may pay
+    /// rent. Bounded to MAX_BATCH periods per call. (ADR-013)
+    pub fn bump_tally(
+        env: Env,
+        campaign_id: u64,
+        code: String,
+        periods: Vec<u64>,
+    ) -> Result<(), Error> {
+        if periods.len() > MAX_BATCH {
+            return Err(Error::BatchTooLarge);
+        }
+        let shared_key = DataKey::Shared(campaign_id, code.clone());
+        if !env.storage().persistent().has(&shared_key) {
+            return Err(Error::SharedNotFound);
+        }
+        env.storage()
+            .persistent()
+            .extend_ttl(&shared_key, LEDGER_BUMP, EXTEND_TO);
+        for i in 0..periods.len() {
+            let p = periods.get(i).unwrap();
+            let tk = DataKey::Tally(campaign_id, code.clone(), p);
+            if env.storage().persistent().has(&tk) {
+                env.storage()
+                    .persistent()
+                    .extend_ttl(&tk, LEDGER_BUMP, EXTEND_TO);
+            }
+            let sk = DataKey::Settled(campaign_id, code.clone(), p);
+            if env.storage().persistent().has(&sk) {
+                env.storage()
+                    .persistent()
+                    .extend_ttl(&sk, LEDGER_BUMP, EXTEND_TO);
+            }
+        }
+        Ok(())
     }
 
     // ─── INTERNAL HELPERS ────────────────────────────────────────
@@ -1694,5 +1750,161 @@ mod test {
             &None::<Address>,
             &0i128,
         ); // #6
+    }
+
+    /// count-only (no payout token) must have rate == 0.
+    #[test]
+    #[should_panic(expected = "Error(Contract, #18)")]
+    fn test_count_only_rate_must_be_zero() {
+        let (env, client) = setup();
+        let owner = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
+        // attributed, no token, but a non-zero rate → #18
+        client.register_shared(
+            &owner,
+            &cid,
+            &String::from_str(&env, "C"),
+            &Some(creator.clone()),
+            &None::<Address>,
+            &5i128,
+        );
+    }
+
+    /// an unattributed code cannot configure a payout token.
+    #[test]
+    #[should_panic(expected = "Error(Contract, #18)")]
+    fn test_unattributed_no_payout_token() {
+        let (env, client) = setup();
+        let owner = Address::generate(&env);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
+        let sac = env.register_stellar_asset_contract_v2(Address::generate(&env));
+        client.register_shared(
+            &owner,
+            &cid,
+            &String::from_str(&env, "C"),
+            &None::<Address>,
+            &Some(sac.address()),
+            &5i128,
+        ); // #18
+    }
+
+    /// an unattributed code may not carry per-attribution counts.
+    #[test]
+    #[should_panic(expected = "Error(Contract, #19)")]
+    fn test_unattributed_rejects_attribution() {
+        let (env, client) = setup();
+        let owner = Address::generate(&env);
+        let x = Address::generate(&env);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
+        let code = String::from_str(&env, "PROMO");
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &None::<Address>,
+            &None::<Address>,
+            &0i128,
+        );
+        let mut attr = Map::new(&env);
+        attr.set(x.clone(), 5u32); // unattributed + per_attribution → #19
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &10u32,
+            &BytesN::from_array(&env, &[0u8; 32]),
+            &attr,
+        );
+    }
+
+    /// register_shared is rejected on an expired campaign.
+    #[test]
+    #[should_panic(expected = "Error(Contract, #4)")]
+    fn test_register_shared_expired() {
+        let (env, client) = setup();
+        let owner = Address::generate(&env);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &500,
+        );
+        env.ledger().set_timestamp(1000); // past expiry
+        client.register_shared(
+            &owner,
+            &cid,
+            &String::from_str(&env, "LATE"),
+            &None::<Address>,
+            &None::<Address>,
+            &0i128,
+        ); // #4
+    }
+
+    /// bump_tally re-extends a shared code + its periods' TTL; unknown code errors.
+    #[test]
+    fn test_bump_tally() {
+        let (env, client) = setup();
+        let owner = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
+        let code = String::from_str(&env, "ROBERTOX");
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &Some(creator.clone()),
+            &None::<Address>,
+            &0i128,
+        );
+        let mut attr = Map::new(&env);
+        attr.set(creator.clone(), 5u32);
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &10u32,
+            &BytesN::from_array(&env, &[0u8; 32]),
+            &attr,
+        );
+        let mut periods = Vec::new(&env);
+        periods.push_back(1u64);
+        client.bump_tally(&cid, &code, &periods);
+        assert_eq!(
+            client.try_bump_tally(&cid, &String::from_str(&env, "NOPE"), &periods),
+            Err(Ok(Error::SharedNotFound))
+        );
     }
 }

@@ -2,17 +2,17 @@
   "network": "testnet",
   "networkPassphrase": "Test SDF Network ; September 2015",
   "rpcUrl": "https://soroban-testnet.stellar.org",
-  "contractId": "CCS7VFN2Z2UPLEU6RE4WBHSCVWPS752WRHKSVMLUTCQOS4PEJ36JO4SU",
+  "contractId": "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX",
   "deployer": "GCIJM67CD2U6XPI5GYS5VYSNIYOKLH7DZ4XA3W45PID7DYCRYFTRDSV6",
-  "wasmHash": "307dd876e4719828782178ffb49f4330d700f15081eec3798d7bd711b8ea8ba6",
+  "wasmHash": "e88e1cda70516721369a5a904ad061ef177eddbfabf76fc69805ebbb2c9c383a",
   "deployedAt": "2026-05-31",
   "profiles": ["burn", "tally"],
-  "features": ["permissionless", "delegates", "owner-index (campaigns_of)", "per-campaign code scope", "term validation", "bump_campaign/bump_codes", "tally (register_shared/commit_tally/get_tally)", "binding attribution", "immutable settlement config (token+rate fixed at register)", "settlement (compute_payouts/settle)"],
+  "features": ["permissionless", "delegates", "owner-index (campaigns_of)", "per-campaign code scope", "term validation", "bump_campaign/bump_codes/bump_tally", "tally (register_shared/commit_tally/get_tally)", "binding attribution + count-only invariants", "tally respects campaign expiry", "immutable settlement config (token+rate fixed at register)", "settlement (compute_payouts/settle)"],
   "seed": {
     "campaign_1_burn": "Demo Cafe — codes DEMO0001, DEMO0002",
-    "shared_tally": "ROBERTOX (campaign 1) — attributed to deployer, payout token = native XLM SAC, rate 50000; period 1 committed: count 40 / 30 attributed"
+    "shared_tally": "ROBERTOX (campaign 1) — attributed to deployer, payout token = native XLM SAC, rate 50000; period 1: count 40 / 30 attributed"
   },
   "nativeXlmSac": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
-  "explorer": "https://stellar.expert/explorer/testnet/contract/CCS7VFN2Z2UPLEU6RE4WBHSCVWPS752WRHKSVMLUTCQOS4PEJ36JO4SU",
-  "supersedes": ["CABN662JJHMXJKHFC5IKXICTGWX7BRXFRYXNLLM4CITJMNHASJSR7OZP", "CBACKFDR4NQLWYQK5XWQWB3GK5YROXYXXXTOEHUKU5BSR7TOIUBOXMRH", "CC2AGE6I2U4MUEJVEIW2WN7B6F57QHIR6R7XV7CCY5TKVK7RI2SWBXDZ", "CBAHKZGA5PCQSATLSZE4W5JSBWGFGKSISUSAKUSVR3UM46KONBLW4PTJ", "CA5AFYJEX2DIFMIH3IGBDBEBTIPSRO2W7FJPK6HOP6CLK2FUTQQS44QP", "CAGBCE2ETELUJM2CCPMMTTP6XEZQN26LD7TMURRA62UQY7WT7WQ2LZBR"]
+  "explorer": "https://stellar.expert/explorer/testnet/contract/CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX",
+  "supersedes": ["CABN662JJHMXJKHFC5IKXICTGWX7BRXFRYXNLLM4CITJMNHASJSR7OZP", "CBACKFDR4NQLWYQK5XWQWB3GK5YROXYXXXTOEHUKU5BSR7TOIUBOXMRH", "CC2AGE6I2U4MUEJVEIW2WN7B6F57QHIR6R7XV7CCY5TKVK7RI2SWBXDZ", "CBAHKZGA5PCQSATLSZE4W5JSBWGFGKSISUSAKUSVR3UM46KONBLW4PTJ", "CA5AFYJEX2DIFMIH3IGBDBEBTIPSRO2W7FJPK6HOP6CLK2FUTQQS44QP", "CAGBCE2ETELUJM2CCPMMTTP6XEZQN26LD7TMURRA62UQY7WT7WQ2LZBR", "CCS7VFN2Z2UPLEU6RE4WBHSCVWPS752WRHKSVMLUTCQOS4PEJ36JO4SU"]
 }
