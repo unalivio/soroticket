@@ -67,7 +67,10 @@ Instead:
 
 - A code may set `attributed_to: Address`. Tally commitments include per-attribution counts.
 - **Settlement** (optional module): given committed per-attribution counts and a payout rate, disburse USDC to attributed creators/referrers — SDP-style. Economical only because Stellar fees are sub-cent, so paying fractions of a cent per conversion is viable.
-- Trust model: receipts are signed and Merkle-anchored, so a creator can independently verify their own number. Disputes resolve against the committed leaves.
+- **Trust model & on-chain/off-chain boundary (Tally).** The chain stores a *commitment* — counts, a Merkle root, per-attribution, and immutable token/rate — not a proof that each underlying redemption is genuine or occurred within the campaign window.
+  - *What the contract enforces:* a single registered creator binds attribution; token + rate are fixed at registration; commitments are append-only per period; settlement pays only the registered address in the registered token; and a code cannot be registered under an expired campaign.
+  - *What it cannot attest by itself:* that the off-chain redemptions are real and happened before `valid_until`. That comes from the **signed receipts** Merkle-anchored by `commit_tally` — anyone can audit a claimed count by checking receipt inclusion against the root, and a creator can independently verify their own number; disputes resolve against the committed leaves.
+  - Because `commit_tally` is intentionally allowed *after* expiry (epochs are tallied retrospectively — ADR-013), the **temporal validity** of redemptions is a *receipt-level* guarantee asserted by the integrator's signing key, not by the contract. Integrators therefore MUST publish their receipt format and signing key and SHOULD timestamp receipts, so the audit is meaningful. State this boundary explicitly in any pitch.
 
 ## 5. Proposed contract interface (permissionless)
 
