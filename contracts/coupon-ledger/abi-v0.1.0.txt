@@ -1,0 +1,231 @@
+#[soroban_sdk::contractargs(name = "Args")]
+#[soroban_sdk::contractclient(name = "Client")]
+pub trait Contract {
+    fn settle(
+        env: soroban_sdk::Env,
+        owner: soroban_sdk::Address,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+        period: u64,
+    ) -> Result<soroban_sdk::Vec<Payout>, soroban_sdk::Error>;
+    fn verify(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+    ) -> Result<CouponToken, soroban_sdk::Error>;
+    fn is_valid(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+    ) -> bool;
+    fn get_tally(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+        period: u64,
+    ) -> Result<TallyCommitment, soroban_sdk::Error>;
+    fn bump_codes(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+        codes: soroban_sdk::Vec<soroban_sdk::String>,
+    ) -> Result<(), soroban_sdk::Error>;
+    fn bump_tally(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+        periods: soroban_sdk::Vec<u64>,
+    ) -> Result<(), soroban_sdk::Error>;
+    fn get_shared(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+    ) -> Result<SharedCode, soroban_sdk::Error>;
+    fn is_delegate(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+        who: soroban_sdk::Address,
+    ) -> bool;
+    fn add_delegate(
+        env: soroban_sdk::Env,
+        owner: soroban_sdk::Address,
+        campaign_id: u64,
+        delegate: soroban_sdk::Address,
+    ) -> Result<(), soroban_sdk::Error>;
+    fn campaigns_of(
+        env: soroban_sdk::Env,
+        owner: soroban_sdk::Address,
+    ) -> soroban_sdk::Vec<u64>;
+    fn commit_tally(
+        env: soroban_sdk::Env,
+        owner: soroban_sdk::Address,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+        period: u64,
+        count: u32,
+        merkle_root: soroban_sdk::BytesN<32>,
+        per_attribution: soroban_sdk::Map<soroban_sdk::Address, u32>,
+    ) -> Result<(), soroban_sdk::Error>;
+    fn get_campaign(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+    ) -> Result<Campaign, soroban_sdk::Error>;
+    fn issue_unique(
+        env: soroban_sdk::Env,
+        owner: soroban_sdk::Address,
+        campaign_id: u64,
+        codes: soroban_sdk::Vec<soroban_sdk::String>,
+    ) -> Result<soroban_sdk::Vec<u64>, soroban_sdk::Error>;
+    fn total_minted(env: soroban_sdk::Env) -> u64;
+    fn bump_campaign(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+    ) -> Result<(), soroban_sdk::Error>;
+    fn redeem_unique(
+        env: soroban_sdk::Env,
+        authorizer: soroban_sdk::Address,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+        redeemer_ref_hash: soroban_sdk::BytesN<32>,
+    ) -> Result<RedemptionReceipt, soroban_sdk::Error>;
+    fn campaign_stats(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+    ) -> Result<CampaignStats, soroban_sdk::Error>;
+    fn compute_payouts(
+        env: soroban_sdk::Env,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+        period: u64,
+    ) -> Result<soroban_sdk::Vec<Payout>, soroban_sdk::Error>;
+    fn create_campaign(
+        env: soroban_sdk::Env,
+        owner: soroban_sdk::Address,
+        name: soroban_sdk::String,
+        discount_type: soroban_sdk::String,
+        discount_value: u64,
+        total_supply: u32,
+        valid_until: u64,
+    ) -> Result<u64, soroban_sdk::Error>;
+    fn register_shared(
+        env: soroban_sdk::Env,
+        owner: soroban_sdk::Address,
+        campaign_id: u64,
+        code: soroban_sdk::String,
+        attributed_to: Option<soroban_sdk::Address>,
+        payout_token: Option<soroban_sdk::Address>,
+        payout_rate: i128,
+    ) -> Result<(), soroban_sdk::Error>;
+    fn remove_delegate(
+        env: soroban_sdk::Env,
+        owner: soroban_sdk::Address,
+        campaign_id: u64,
+        delegate: soroban_sdk::Address,
+    ) -> Result<(), soroban_sdk::Error>;
+    fn total_campaigns(env: soroban_sdk::Env) -> u64;
+}
+#[soroban_sdk::contracttype(export = false)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Payout {
+    pub amount: i128,
+    pub to: soroban_sdk::Address,
+}
+#[soroban_sdk::contracttype(export = false)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct Campaign {
+    pub burned: u32,
+    pub discount_type: soroban_sdk::String,
+    pub discount_value: u64,
+    pub id: u64,
+    pub minted: u32,
+    pub name: soroban_sdk::String,
+    pub owner: soroban_sdk::Address,
+    pub total_supply: u32,
+    pub valid_until: u64,
+}
+#[soroban_sdk::contracttype(export = false)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct SharedCode {
+    pub attributed_to: Option<soroban_sdk::Address>,
+    pub campaign_id: u64,
+    pub code: soroban_sdk::String,
+    pub payout_rate: i128,
+    pub payout_token: Option<soroban_sdk::Address>,
+    pub registered_at: u64,
+}
+#[soroban_sdk::contracttype(export = false)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct CouponToken {
+    pub burned_at: u64,
+    pub campaign_id: u64,
+    pub code: soroban_sdk::String,
+    pub is_burned: bool,
+    pub minted_at: u64,
+    pub redeemer_ref: soroban_sdk::BytesN<32>,
+    pub token_id: u64,
+}
+#[soroban_sdk::contracttype(export = false)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct CampaignStats {
+    pub available: u32,
+    pub burned: u32,
+    pub is_expired: bool,
+    pub minted: u32,
+    pub total_supply: u32,
+}
+#[soroban_sdk::contracttype(export = false)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct TallyCommitment {
+    pub count: u32,
+    pub merkle_root: soroban_sdk::BytesN<32>,
+    pub per_attribution: soroban_sdk::Map<soroban_sdk::Address, u32>,
+    pub period: u64,
+}
+#[soroban_sdk::contracttype(export = false)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub struct RedemptionReceipt {
+    pub burned_at: u64,
+    pub campaign_id: u64,
+    pub campaign_name: soroban_sdk::String,
+    pub code: soroban_sdk::String,
+    pub discount_type: soroban_sdk::String,
+    pub discount_value: u64,
+    pub ledger_seq: u32,
+    pub redeemer_ref: soroban_sdk::BytesN<32>,
+    pub token_id: u64,
+}
+#[soroban_sdk::contracttype(export = false)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum DataKey {
+    Campaign(u64),
+    Token(u64),
+    CodeIndex(u64, soroban_sdk::String),
+    Delegate(u64, soroban_sdk::Address),
+    OwnerIndex(soroban_sdk::Address),
+    Shared(u64, soroban_sdk::String),
+    Tally(u64, soroban_sdk::String, u64),
+    Settled(u64, soroban_sdk::String, u64),
+}
+#[soroban_sdk::contracterror(export = false)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Error {
+    CampaignNotFound = 1,
+    CouponNotFound = 2,
+    AlreadyRedeemed = 3,
+    CampaignExpired = 4,
+    SupplyExhausted = 5,
+    Unauthorized = 6,
+    InvalidCode = 7,
+    DuplicateCode = 8,
+    InvalidTerms = 9,
+    BatchTooLarge = 10,
+    CodeTooLong = 11,
+    SharedNotFound = 12,
+    AlreadyRegistered = 13,
+    PeriodCommitted = 14,
+    TallyNotFound = 15,
+    AlreadySettled = 16,
+    InvalidTally = 17,
+    InvalidSettlement = 18,
+    AttributionMismatch = 19,
+}
+
