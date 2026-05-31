@@ -41,7 +41,12 @@ function TallyRegister() {
     setBusy(kind); setError(null); setResult(null);
     try {
       if (kind === "register") {
-        await registerShared(cid, code.trim().toUpperCase(), attr.trim() || null, token.trim() || null, rate);
+        // enforce the contract's invariants client-side: no payout without a
+        // recipient, and rate 0 unless a token is set
+        const attributed = attr.trim() || null;
+        const tok = attributed ? (token.trim() || null) : null;
+        const rt = tok ? rate : 0;
+        await registerShared(cid, code.trim().toUpperCase(), attributed, tok, rt);
         toast({ kind: "success", title: "Shared code registered", msg: `${code.toUpperCase()} is live under campaign #${cid}.` });
         setResult({ kind: "register" });
       } else {
