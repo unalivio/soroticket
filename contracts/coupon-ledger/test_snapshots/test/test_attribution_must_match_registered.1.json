@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 3,
+    "address": 4,
     "nonce": 0
   },
   "auth": [
@@ -55,7 +55,7 @@
                   "u64": 1
                 },
                 {
-                  "string": "PROMO"
+                  "string": "ROBERTOX"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
@@ -266,7 +266,7 @@
                   "u64": 1
                 },
                 {
-                  "string": "PROMO"
+                  "string": "ROBERTOX"
                 }
               ]
             },
@@ -289,7 +289,7 @@
                       "u64": 1
                     },
                     {
-                      "string": "PROMO"
+                      "string": "ROBERTOX"
                     }
                   ]
                 },
@@ -317,7 +317,7 @@
                         "symbol": "code"
                       },
                       "val": {
-                        "string": "PROMO"
+                        "string": "ROBERTOX"
                       }
                     },
                     {

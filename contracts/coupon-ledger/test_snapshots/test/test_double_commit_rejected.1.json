@@ -57,7 +57,14 @@
                 {
                   "string": "PROMO"
                 },
-                "void"
+                "void",
+                "void",
+                {
+                  "i128": {
+                    "hi": 0,
+                    "lo": 0
+                  }
+                }
               ]
             }
           },
@@ -345,6 +352,23 @@
                       "val": {
                         "string": "PROMO"
                       }
+                    },
+                    {
+                      "key": {
+                        "symbol": "payout_rate"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 0
+                        }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "payout_token"
+                      },
+                      "val": "void"
                     },
                     {
                       "key": {
