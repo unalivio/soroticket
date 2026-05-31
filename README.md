@@ -32,8 +32,8 @@ Spec nouns: **Campaign → Code → Redemption → Settlement.**
 
 ## Two redemption profiles
 
-- **Burn (synchronous):** unique single-use tokens. One on-chain tx per redemption. Best for tickets and high-value vouchers — real-time double-use prevention "at the door." *(This is what the donor contract already does.)*
-- **Tally (asynchronous):** shared multi-use codes. Hot path off-chain; periodic on-chain commitment of redemption counts + attribution via Merkle-anchored receipts. Cheap at scale and the basis for trustless creator payouts. *(This is the new work.)*
+- **Burn (synchronous):** unique single-use tokens. One on-chain tx per redemption. Best for tickets and high-value vouchers — real-time double-use prevention "at the door." *(Implemented.)*
+- **Tally (asynchronous):** shared multi-use codes. Hot path off-chain; periodic on-chain commitment of redemption counts + attribution via Merkle-anchored receipts, with binding attribution and token settlement. Cheap at scale and the basis for trustless creator payouts. *(Implemented — ADR-011.)*
 
 ## Repo layout
 
@@ -42,7 +42,7 @@ sorodeal/
 ├── README.md
 ├── CLAUDE.md                 # orientation for AI sessions — read this first
 ├── contracts/
-│   └── coupon-ledger/        # reference Soroban contract — permissionless Burn profile (ADR-002/005); Tally is next
+│   └── coupon-ledger/        # reference Soroban contract — permissionless Burn + Tally profiles (ADR-002/005/011)
 │       ├── src/lib.rs
 │       ├── Cargo.toml
 │       └── test_snapshots/
@@ -50,6 +50,8 @@ sorodeal/
 │   ├── SPEC.md               # the protocol spec (the real design target)
 │   ├── SCF.md                # Stellar Community Fund tranche/milestone plan
 │   └── DECISIONS.md          # architecture decision records
+├── deployments/              # on-chain deployment records (testnet.json)
+├── web/                      # developer playground — Vite/React + Freighter (Burn + Tally)
 └── reference/
     └── botcore-donor/        # reference-only Go from the prototype (does NOT build standalone)
         ├── stellar-adapter/  # how the contract was invoked (CLI shell-out — to be rewritten with the Go SDK)

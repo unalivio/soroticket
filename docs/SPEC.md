@@ -92,13 +92,17 @@ add_delegate(owner, campaign_id, delegate: Address)                    // requir
 remove_delegate(owner, campaign_id, delegate: Address)                 // require_auth(owner)
 is_delegate(campaign_id, who: Address) -> bool                         // public, no auth
 
-// Tally profile (shared)
-register_shared(owner, campaign_id, code, policy, attributed_to: Option<Address>)  // require_auth(owner)
-commit_tally(owner, campaign_id, code, period, count, merkle_root)     // require_auth(owner)
-get_tally(campaign_id, code, period) -> TallyCommitment
+// Tally profile (shared) — implemented (ADR-011)
+register_shared(owner, campaign_id, code, attributed_to: Option<Address>,
+                payout_token: Option<Address>, payout_rate: i128)      // require_auth(owner); token+rate fixed & immutable here
+get_shared(campaign_id, code) -> SharedCode                            // public, no auth
+commit_tally(owner, campaign_id, code, period, count, merkle_root,
+             per_attribution: Map<Address,u32>)                        // require_auth(owner); append-only; attribution must match the registered creator
+get_tally(campaign_id, code, period) -> TallyCommitment                // public, no auth
 
-// Settlement (optional module)
-settle(campaign_id, period, asset, rate) -> Vec<Payout>                // pays attributed_to addresses
+// Settlement (implemented) — token + rate come from the shared code (immutable; not caller-supplied)
+compute_payouts(campaign_id, code, period) -> Vec<Payout>              // public, read-only preview
+settle(owner, campaign_id, code, period) -> Vec<Payout>                // require_auth(owner); pays attributed_to in payout_token, once per period
 ```
 
 ### Data structures (target)
