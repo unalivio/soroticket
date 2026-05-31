@@ -1,4 +1,6 @@
 #![no_std]
+// Soroban entry points legitimately take many typed parameters (env + args).
+#![allow(clippy::too_many_arguments)]
 
 //! Sorodeal coupon-ledger — Burn profile (permissionless).
 //!
@@ -118,7 +120,7 @@ pub struct SharedCode {
     pub code: String,
     pub attributed_to: Option<Address>, // creator/referrer credited for redemptions
     pub payout_token: Option<Address>,  // settlement token (SAC); None = count-only, no payout
-    pub payout_rate: i128,              // token base-units per attributed redemption (> 0 if payout_token set)
+    pub payout_rate: i128, // token base-units per attributed redemption (> 0 if payout_token set)
     pub registered_at: u64,
 }
 
@@ -183,11 +185,11 @@ const TOKEN_CTR: Symbol = symbol_short!("tok_ctr");
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
-    Campaign(u64),          // Campaign by ID
-    Token(u64),             // CouponToken by token ID
-    CodeIndex(u64, String), // (campaign_id, code) → token ID — scoped per campaign (ADR-009)
-    Delegate(u64, Address), // (campaign_id, delegate) present ⇒ authorized to redeem
-    OwnerIndex(Address),    // owner → Vec<u64> of the campaign IDs they created
+    Campaign(u64),             // Campaign by ID
+    Token(u64),                // CouponToken by token ID
+    CodeIndex(u64, String),    // (campaign_id, code) → token ID — scoped per campaign (ADR-009)
+    Delegate(u64, Address),    // (campaign_id, delegate) present ⇒ authorized to redeem
+    OwnerIndex(Address),       // owner → Vec<u64> of the campaign IDs they created
     Shared(u64, String),       // (campaign_id, code) → SharedCode (Tally)
     Tally(u64, String, u64),   // (campaign_id, code, period) → TallyCommitment
     Settled(u64, String, u64), // (campaign_id, code, period) present ⇒ already settled
@@ -715,7 +717,9 @@ impl CouponLedger {
             registered_at: env.ledger().timestamp(),
         };
         env.storage().persistent().set(&key, &shared);
-        env.storage().persistent().extend_ttl(&key, LEDGER_BUMP, EXTEND_TO);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, LEDGER_BUMP, EXTEND_TO);
 
         env.events().publish(
             (symbol_short!("shared"), symbol_short!("reg")),
@@ -781,7 +785,9 @@ impl CouponLedger {
             per_attribution,
         };
         env.storage().persistent().set(&key, &commitment);
-        env.storage().persistent().extend_ttl(&key, LEDGER_BUMP, EXTEND_TO);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, LEDGER_BUMP, EXTEND_TO);
 
         env.events().publish(
             (symbol_short!("tally"), symbol_short!("commit")),
@@ -854,7 +860,10 @@ impl CouponLedger {
             .persistent()
             .get(&DataKey::Shared(campaign_id, code.clone()))
             .ok_or(Error::SharedNotFound)?;
-        let token = shared.payout_token.clone().ok_or(Error::InvalidSettlement)?;
+        let token = shared
+            .payout_token
+            .clone()
+            .ok_or(Error::InvalidSettlement)?;
         if shared.payout_rate <= 0 {
             return Err(Error::InvalidSettlement);
         }
@@ -1380,28 +1389,66 @@ mod test {
         let (env, client) = setup();
         let owner = Address::generate(&env);
         let creator = Address::generate(&env);
-        let cid = client.create_campaign(&owner, &String::from_str(&env, "UGC"), &String::from_str(&env, "percentage"), &1000, &1000, &9999999999);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
         let code = String::from_str(&env, "ROBERTOX");
 
         // settlement token + rate are fixed at registration (immutable)
         let sac = env.register_stellar_asset_contract_v2(Address::generate(&env));
         let token_addr = sac.address();
-        client.register_shared(&owner, &cid, &code, &Some(creator.clone()), &Some(token_addr.clone()), &5i128);
-        assert_eq!(client.get_shared(&cid, &code).attributed_to, Some(creator.clone()));
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &Some(creator.clone()),
+            &Some(token_addr.clone()),
+            &5i128,
+        );
+        assert_eq!(
+            client.get_shared(&cid, &code).attributed_to,
+            Some(creator.clone())
+        );
 
         let mut attr = Map::new(&env);
         attr.set(creator.clone(), 30u32);
-        client.commit_tally(&owner, &cid, &code, &1u64, &40u32, &BytesN::from_array(&env, &[9u8; 32]), &attr);
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &40u32,
+            &BytesN::from_array(&env, &[9u8; 32]),
+            &attr,
+        );
         assert_eq!(client.get_tally(&cid, &code, &1u64).count, 40);
 
         // preview uses the code's fixed rate (no rate arg) → 30 * 5 = 150
-        assert_eq!(client.compute_payouts(&cid, &code, &1u64).get(0).unwrap().amount, 150);
+        assert_eq!(
+            client
+                .compute_payouts(&cid, &code, &1u64)
+                .get(0)
+                .unwrap()
+                .amount,
+            150
+        );
 
         token::StellarAssetClient::new(&env, &token_addr).mint(&owner, &1000i128);
         let payouts = client.settle(&owner, &cid, &code, &1u64);
         assert_eq!(payouts.len(), 1);
-        assert_eq!(token::Client::new(&env, &token_addr).balance(&creator), 150i128);
-        assert_eq!(token::Client::new(&env, &token_addr).balance(&owner), 850i128);
+        assert_eq!(
+            token::Client::new(&env, &token_addr).balance(&creator),
+            150i128
+        );
+        assert_eq!(
+            token::Client::new(&env, &token_addr).balance(&owner),
+            850i128
+        );
     }
 
     /// A code registered to creator A cannot credit B — attribution is binding.
@@ -1412,12 +1459,34 @@ mod test {
         let owner = Address::generate(&env);
         let a = Address::generate(&env);
         let b = Address::generate(&env);
-        let cid = client.create_campaign(&owner, &String::from_str(&env, "UGC"), &String::from_str(&env, "percentage"), &1000, &1000, &9999999999);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
         let code = String::from_str(&env, "ROBERTOX");
-        client.register_shared(&owner, &cid, &code, &Some(a.clone()), &None::<Address>, &0i128);
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &Some(a.clone()),
+            &None::<Address>,
+            &0i128,
+        );
         let mut attr = Map::new(&env);
         attr.set(b.clone(), 5u32); // credit B, not registered A → #19
-        client.commit_tally(&owner, &cid, &code, &1u64, &10u32, &BytesN::from_array(&env, &[0u8; 32]), &attr);
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &10u32,
+            &BytesN::from_array(&env, &[0u8; 32]),
+            &attr,
+        );
     }
 
     /// rate must be > 0 when a payout token is configured.
@@ -1426,9 +1495,23 @@ mod test {
     fn test_register_rate_must_be_positive() {
         let (env, client) = setup();
         let owner = Address::generate(&env);
-        let cid = client.create_campaign(&owner, &String::from_str(&env, "UGC"), &String::from_str(&env, "percentage"), &1000, &1000, &9999999999);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
         let sac = env.register_stellar_asset_contract_v2(Address::generate(&env));
-        client.register_shared(&owner, &cid, &String::from_str(&env, "C"), &None::<Address>, &Some(sac.address()), &0i128); // rate 0 → #18
+        client.register_shared(
+            &owner,
+            &cid,
+            &String::from_str(&env, "C"),
+            &None::<Address>,
+            &Some(sac.address()),
+            &0i128,
+        ); // rate 0 → #18
     }
 
     /// settle on a code with no payout token configured is rejected (not locked).
@@ -1438,12 +1521,34 @@ mod test {
         let (env, client) = setup();
         let owner = Address::generate(&env);
         let creator = Address::generate(&env);
-        let cid = client.create_campaign(&owner, &String::from_str(&env, "UGC"), &String::from_str(&env, "percentage"), &1000, &1000, &9999999999);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
         let code = String::from_str(&env, "PROMO");
-        client.register_shared(&owner, &cid, &code, &Some(creator.clone()), &None::<Address>, &0i128); // no token
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &Some(creator.clone()),
+            &None::<Address>,
+            &0i128,
+        ); // no token
         let mut attr = Map::new(&env);
         attr.set(creator.clone(), 5u32);
-        client.commit_tally(&owner, &cid, &code, &1u64, &10u32, &BytesN::from_array(&env, &[0u8; 32]), &attr);
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &10u32,
+            &BytesN::from_array(&env, &[0u8; 32]),
+            &attr,
+        );
         client.settle(&owner, &cid, &code, &1u64); // not configured → #18
     }
 
@@ -1454,13 +1559,35 @@ mod test {
         let (env, client) = setup();
         let owner = Address::generate(&env);
         let creator = Address::generate(&env);
-        let cid = client.create_campaign(&owner, &String::from_str(&env, "UGC"), &String::from_str(&env, "percentage"), &1000, &1000, &9999999999);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
         let code = String::from_str(&env, "ROBERTOX");
         let sac = env.register_stellar_asset_contract_v2(Address::generate(&env));
-        client.register_shared(&owner, &cid, &code, &Some(creator.clone()), &Some(sac.address()), &5i128);
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &Some(creator.clone()),
+            &Some(sac.address()),
+            &5i128,
+        );
         let mut attr = Map::new(&env);
         attr.set(creator.clone(), 10u32);
-        client.commit_tally(&owner, &cid, &code, &1u64, &10u32, &BytesN::from_array(&env, &[1u8; 32]), &attr);
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &10u32,
+            &BytesN::from_array(&env, &[1u8; 32]),
+            &attr,
+        );
         token::StellarAssetClient::new(&env, &sac.address()).mint(&owner, &1000i128);
         client.settle(&owner, &cid, &code, &1u64);
         client.settle(&owner, &cid, &code, &1u64); // #16
@@ -1471,12 +1598,42 @@ mod test {
     fn test_double_commit_rejected() {
         let (env, client) = setup();
         let owner = Address::generate(&env);
-        let cid = client.create_campaign(&owner, &String::from_str(&env, "UGC"), &String::from_str(&env, "percentage"), &1000, &1000, &9999999999);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
         let code = String::from_str(&env, "PROMO");
-        client.register_shared(&owner, &cid, &code, &None::<Address>, &None::<Address>, &0i128);
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &None::<Address>,
+            &None::<Address>,
+            &0i128,
+        );
         let attr = Map::new(&env);
-        client.commit_tally(&owner, &cid, &code, &1u64, &5u32, &BytesN::from_array(&env, &[0u8; 32]), &attr);
-        client.commit_tally(&owner, &cid, &code, &1u64, &7u32, &BytesN::from_array(&env, &[0u8; 32]), &attr); // #14
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &5u32,
+            &BytesN::from_array(&env, &[0u8; 32]),
+            &attr,
+        );
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &7u32,
+            &BytesN::from_array(&env, &[0u8; 32]),
+            &attr,
+        ); // #14
     }
 
     #[test]
@@ -1485,12 +1642,34 @@ mod test {
         let (env, client) = setup();
         let owner = Address::generate(&env);
         let creator = Address::generate(&env);
-        let cid = client.create_campaign(&owner, &String::from_str(&env, "UGC"), &String::from_str(&env, "percentage"), &1000, &1000, &9999999999);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
         let code = String::from_str(&env, "PROMO");
-        client.register_shared(&owner, &cid, &code, &Some(creator.clone()), &None::<Address>, &0i128);
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &Some(creator.clone()),
+            &None::<Address>,
+            &0i128,
+        );
         let mut attr = Map::new(&env);
         attr.set(creator.clone(), 50u32); // 50 > count 10 → #17
-        client.commit_tally(&owner, &cid, &code, &1u64, &10u32, &BytesN::from_array(&env, &[0u8; 32]), &attr);
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &10u32,
+            &BytesN::from_array(&env, &[0u8; 32]),
+            &attr,
+        );
     }
 
     #[test]
@@ -1499,7 +1678,21 @@ mod test {
         let (env, client) = setup();
         let owner = Address::generate(&env);
         let stranger = Address::generate(&env);
-        let cid = client.create_campaign(&owner, &String::from_str(&env, "UGC"), &String::from_str(&env, "percentage"), &1000, &1000, &9999999999);
-        client.register_shared(&stranger, &cid, &String::from_str(&env, "X"), &None::<Address>, &None::<Address>, &0i128); // #6
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
+        client.register_shared(
+            &stranger,
+            &cid,
+            &String::from_str(&env, "X"),
+            &None::<Address>,
+            &None::<Address>,
+            &0i128,
+        ); // #6
     }
 }
