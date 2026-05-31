@@ -192,7 +192,9 @@ async function getCampaign(id) {
 }
 
 /* ── Tally profile (shared codes) — ADR-003/004/011 ── */
-const scI128 = (n) => nativeToScVal(BigInt(n), { type: "i128" });
+// i128 from a decimal string/BigInt — exact, never via Number (avoids precision loss)
+const scI128 = (n) => nativeToScVal(BigInt(String(n ?? "0").trim().split(".")[0] || "0"), { type: "i128" });
+const scVecU64 = (arr) => xdr.ScVal.scvVec((arr || []).map((n) => scU64(n)));
 const scOptAddr = (a) => (a ? scAddr(a) : xdr.ScVal.scvVoid()); // Option<Address>: Some|None
 const scMapAddrU32 = (pairs) =>
   xdr.ScVal.scvMap(
@@ -203,7 +205,7 @@ async function registerShared(from, campaignId, code, attributedTo, payoutToken,
   // payout token + rate are fixed at registration (immutable) — settle uses them
   return await write(from, "register_shared", [
     scAddr(from), scU64(campaignId), scStr(code),
-    scOptAddr(attributedTo), scOptAddr(payoutToken), scI128(payoutRate || 0),
+    scOptAddr(attributedTo), scOptAddr(payoutToken), scI128(payoutRate),
   ]);
 }
 async function getShared(campaignId, code) {
@@ -227,10 +229,14 @@ async function settle(from, campaignId, code, period) {
   // token + rate are read from the shared code on-chain (immutable)
   return await write(from, "settle", [scAddr(from), scU64(campaignId), scStr(code), scU64(period)]);
 }
+async function bumpTally(from, campaignId, code, periods) {
+  // public maintenance: re-extend a shared code + its periods' storage TTL (from = fee payer)
+  return await write(from, "bump_tally", [scU64(campaignId), scStr(code), scVecU64(periods)]);
+}
 
 window.SDK = {
   read, write, connectWallet, getBalance, toNative, bytesToHex,
   campaignsOf, getCampaign,
-  registerShared, getShared, commitTally, getTally, computePayouts, settle,
+  registerShared, getShared, commitTally, getTally, computePayouts, settle, bumpTally,
   scAddr, scStr, scU64, scU32, scVecStr, scBytes32, scI128,
 };

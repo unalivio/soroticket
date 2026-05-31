@@ -45,14 +45,15 @@ function TallyRegister() {
         // recipient, and rate 0 unless a token is set
         const attributed = attr.trim() || null;
         const tok = attributed ? (token.trim() || null) : null;
-        const rt = tok ? rate : 0;
+        const rt = tok ? rate : "0"; // keep as string — i128, never coerce to Number
         await registerShared(cid, code.trim().toUpperCase(), attributed, tok, rt);
         toast({ kind: "success", title: "Shared code registered", msg: `${code.toUpperCase()} is live under campaign #${cid}.` });
         setResult({ kind: "register" });
       } else {
         const per = attr.trim() ? [[attr.trim(), Number(attrCount)]] : [];
+        const attributed = per.length ? attrCount : 0; // toast must match what's actually sent
         await commitTally(cid, code.trim().toUpperCase(), period, count, merkle, per);
-        toast({ kind: "success", title: "Tally committed", msg: `Period ${period}: ${count} redemptions (${attrCount} attributed).` });
+        toast({ kind: "success", title: "Tally committed", msg: `Period ${period}: ${count} redemptions (${attributed} attributed).` });
         setResult({ kind: "commit" });
       }
     } catch (err) { setError(err.sd); toast({ kind: "error", title: err.sd.title, msg: err.sd.msg }); }
@@ -151,7 +152,7 @@ function TallyRegister() {
 
 /* ── 08 · Audit a tally + compute payouts + settle ───────────── */
 function TallySettle() {
-  const { wallet, getShared, getTally, computePayouts, settle, toast } = useApp();
+  const { wallet, getShared, getTally, computePayouts, settle, bumpTally, toast } = useApp();
   const SD = window.SD;
   const [cid, setCid] = useState("1");
   const [code, setCode] = useState("ROBERTOX");
@@ -180,6 +181,15 @@ function TallySettle() {
       const { result } = await settle(cid, code.trim().toUpperCase(), period);
       toast({ kind: "success", title: "Settled", msg: `${result.payouts.length} payout(s) sent.` });
       setPayouts(result.payouts);
+    } catch (err) { setError(err.sd); toast({ kind: "error", title: err.sd.title, msg: err.sd.msg }); }
+    finally { setBusy(""); }
+  };
+
+  const doBump = async () => {
+    setBusy("bump"); setError(null);
+    try {
+      await bumpTally(cid, code.trim().toUpperCase(), period);
+      toast({ kind: "success", title: "TTL extended", msg: `Storage for ${code.toUpperCase()} (period ${period}) re-extended.` });
     } catch (err) { setError(err.sd); toast({ kind: "error", title: err.sd.title, msg: err.sd.msg }); }
     finally { setBusy(""); }
   };
@@ -220,7 +230,7 @@ function TallySettle() {
           {shared && (
             <KV k="settlement">
               {shared.payout_token
-                ? <span><span className="mono" style={{ fontWeight: 600 }}>{Number(shared.payout_rate).toLocaleString()}</span> <span className="faint" style={{ fontSize: 12 }}>per redemption ·</span> <CopyBare value={shared.payout_token} display={SD.trunc(shared.payout_token, 4, 4)} /></span>
+                ? <span><span className="mono" style={{ fontWeight: 600 }}>{shared.payout_rate}</span> <span className="faint" style={{ fontSize: 12 }}>per redemption ·</span> <CopyBare value={shared.payout_token} display={SD.trunc(shared.payout_token, 4, 4)} /></span>
                 : <span className="faint">count-only (no payout token)</span>}
             </KV>
           )}
@@ -233,7 +243,7 @@ function TallySettle() {
             <div className="divider" style={{ margin: "6px 0 2px" }} />
             <div className="kv-k" style={{ marginBottom: 6 }}>Payouts (at the code's fixed rate)</div>
             {payouts.length
-              ? payouts.map((p) => (<KV key={p.to} k={SD.trunc(p.to, 6, 6)}><span className="mono" style={{ fontWeight: 600 }}>{p.amount.toLocaleString()}</span></KV>))
+              ? payouts.map((p) => (<KV key={p.to} k={SD.trunc(p.to, 6, 6)}><span className="mono" style={{ fontWeight: 600 }}>{p.amount}</span></KV>))
               : <span className="faint" style={{ fontSize: 13 }}>No attributed payouts for this period.</span>}
           </>)}
         </ResultPanel>
@@ -242,6 +252,7 @@ function TallySettle() {
       <div className="divider" style={{ margin: "10px 0 8px" }} />
       <div className="form-actions">
         <span className="authtag" style={{ marginRight: "auto" }}><Ic.lock />owner only · token &amp; rate from the registered code</span>
+        <button className="btn-plain" onClick={doBump} disabled={!wallet || busy === "bump"}>{busy === "bump" ? <Spinner size={14} /> : <Ic.hash style={{ width: 14, height: 14 }} />} Bump TTL</button>
         <Btn variant="primary" loading={busy === "settle"} onClick={doSettle} disabled={!wallet} icon={<Ic.globe style={{ width: 15, height: 15 }} />}>{busy === "settle" ? "Settling" : "Settle & pay"}</Btn>
         <span className="help">{wallet ? "Transfers real tokens — once per period, irreversible" : "Connect Freighter to settle"}</span>
       </div>
