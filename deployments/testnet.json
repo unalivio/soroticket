@@ -1,0 +1,14 @@
+{
+  "network": "testnet",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "contractId": "CAGBCE2ETELUJM2CCPMMTTP6XEZQN26LD7TMURRA62UQY7WT7WQ2LZBR",
+  "deployer": "GCIJM67CD2U6XPI5GYS5VYSNIYOKLH7DZ4XA3W45PID7DYCRYFTRDSV6",
+  "wasmHash": "c6ecf256c1ab9d43ff611abac4f627e3cb966577ef2c43c5fd7279504d3bfc72",
+  "deployedAt": "2026-05-31",
+  "profiles": ["burn", "tally"],
+  "features": ["permissionless", "delegates", "owner-index (campaigns_of)", "per-campaign code scope", "term validation", "bump_campaign", "bump_codes", "tally (register_shared/commit_tally/get_tally)", "settlement (compute_payouts/settle)"],
+  "seed": { "campaign_1": "Demo Cafe (burn): DEMO0001, DEMO0002", "shared": "ROBERTOX (tally, attributed to deployer), period 1: count 40 / 30 attributed" },
+  "explorer": "https://stellar.expert/explorer/testnet/contract/CAGBCE2ETELUJM2CCPMMTTP6XEZQN26LD7TMURRA62UQY7WT7WQ2LZBR",
+  "supersedes": ["CABN662JJHMXJKHFC5IKXICTGWX7BRXFRYXNLLM4CITJMNHASJSR7OZP", "CBACKFDR4NQLWYQK5XWQWB3GK5YROXYXXXTOEHUKU5BSR7TOIUBOXMRH", "CC2AGE6I2U4MUEJVEIW2WN7B6F57QHIR6R7XV7CCY5TKVK7RI2SWBXDZ", "CBAHKZGA5PCQSATLSZE4W5JSBWGFGKSISUSAKUSVR3UM46KONBLW4PTJ", "CA5AFYJEX2DIFMIH3IGBDBEBTIPSRO2W7FJPK6HOP6CLK2FUTQQS44QP"]
+}

@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 2,
+    "address": 3,
     "nonce": 0
   },
   "auth": [
@@ -18,16 +18,16 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "string": "Promo"
+                  "string": "UGC"
                 },
                 {
-                  "string": "fixed_amount"
+                  "string": "percentage"
                 },
                 {
-                  "u64": 500
+                  "u64": 1000
                 },
                 {
-                  "u32": 10
+                  "u32": 1000
                 },
                 {
                   "u64": 9999999999
@@ -46,7 +46,7 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "issue_unique",
+              "function_name": "register_shared",
               "args": [
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -55,39 +55,10 @@
                   "u64": 1
                 },
                 {
-                  "vec": [
-                    {
-                      "string": "TESTCODE"
-                    }
-                  ]
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "redeem_unique",
-              "args": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                  "string": "PROMO"
                 },
                 {
-                  "u64": 1
-                },
-                {
-                  "string": "TESTCODE"
-                },
-                {
-                  "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 }
               ]
             }
@@ -150,7 +121,7 @@
                         "symbol": "burned"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     },
                     {
@@ -158,7 +129,7 @@
                         "symbol": "discount_type"
                       },
                       "val": {
-                        "string": "fixed_amount"
+                        "string": "percentage"
                       }
                     },
                     {
@@ -166,7 +137,7 @@
                         "symbol": "discount_value"
                       },
                       "val": {
-                        "u64": 500
+                        "u64": 1000
                       }
                     },
                     {
@@ -182,7 +153,7 @@
                         "symbol": "minted"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     },
                     {
@@ -190,7 +161,7 @@
                         "symbol": "name"
                       },
                       "val": {
-                        "string": "Promo"
+                        "string": "UGC"
                       }
                     },
                     {
@@ -206,7 +177,7 @@
                         "symbol": "total_supply"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 1000
                       }
                     },
                     {
@@ -218,57 +189,6 @@
                       }
                     }
                   ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          2678400
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "CodeIndex"
-                },
-                {
-                  "u64": 1
-                },
-                {
-                  "string": "TESTCODE"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "CodeIndex"
-                    },
-                    {
-                      "u64": 1
-                    },
-                    {
-                      "string": "TESTCODE"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u64": 1
                 }
               }
             },
@@ -333,10 +253,13 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "Token"
+                  "symbol": "Shared"
                 },
                 {
                   "u64": 1
+                },
+                {
+                  "string": "PROMO"
                 }
               ]
             },
@@ -353,10 +276,13 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "Token"
+                      "symbol": "Shared"
                     },
                     {
                       "u64": 1
+                    },
+                    {
+                      "string": "PROMO"
                     }
                   ]
                 },
@@ -365,10 +291,10 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "burned_at"
+                        "symbol": "attributed_to"
                       },
                       "val": {
-                        "u64": 0
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                       }
                     },
                     {
@@ -384,39 +310,15 @@
                         "symbol": "code"
                       },
                       "val": {
-                        "string": "TESTCODE"
+                        "string": "PROMO"
                       }
                     },
                     {
                       "key": {
-                        "symbol": "is_burned"
-                      },
-                      "val": {
-                        "bool": true
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "minted_at"
+                        "symbol": "registered_at"
                       },
                       "val": {
                         "u64": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "redeemer_ref"
-                      },
-                      "val": {
-                        "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "token_id"
-                      },
-                      "val": {
-                        "u64": 1
                       }
                     }
                   ]
@@ -458,14 +360,6 @@
                         "val": {
                           "u64": 1
                         }
-                      },
-                      {
-                        "key": {
-                          "symbol": "tok_ctr"
-                        },
-                        "val": {
-                          "u64": 1
-                        }
                       }
                     ]
                   }
@@ -499,39 +393,6 @@
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 801925984706572462
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 1033654523790656264
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 1033654523790656264
                   }
                 },
                 "durability": "temporary",

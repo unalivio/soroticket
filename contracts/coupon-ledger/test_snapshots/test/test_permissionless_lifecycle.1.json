@@ -88,6 +88,9 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
+                  "u64": 1
+                },
+                {
                   "string": "PK486CZQ"
                 },
                 {
@@ -243,6 +246,9 @@
                   "symbol": "CodeIndex"
                 },
                 {
+                  "u64": 1
+                },
+                {
                   "string": "MLSJXKVM"
                 }
               ]
@@ -261,6 +267,9 @@
                   "vec": [
                     {
                       "symbol": "CodeIndex"
+                    },
+                    {
+                      "u64": 1
                     },
                     {
                       "string": "MLSJXKVM"
@@ -288,6 +297,9 @@
                   "symbol": "CodeIndex"
                 },
                 {
+                  "u64": 1
+                },
+                {
                   "string": "PK486CZQ"
                 }
               ]
@@ -308,6 +320,9 @@
                       "symbol": "CodeIndex"
                     },
                     {
+                      "u64": 1
+                    },
+                    {
                       "string": "PK486CZQ"
                     }
                   ]
@@ -315,6 +330,55 @@
                 "durability": "persistent",
                 "val": {
                   "u64": 1
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          2678400
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "OwnerIndex"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "OwnerIndex"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "vec": [
+                    {
+                      "u64": 1
+                    }
+                  ]
                 }
               }
             },

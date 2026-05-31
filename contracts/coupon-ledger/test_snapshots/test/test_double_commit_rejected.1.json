@@ -18,16 +18,16 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "string": "Promo"
+                  "string": "UGC"
                 },
                 {
-                  "string": "fixed_amount"
+                  "string": "percentage"
                 },
                 {
-                  "u64": 500
+                  "u64": 1000
                 },
                 {
-                  "u32": 10
+                  "u32": 1000
                 },
                 {
                   "u64": 9999999999
@@ -46,7 +46,7 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "issue_unique",
+              "function_name": "register_shared",
               "args": [
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -55,12 +55,9 @@
                   "u64": 1
                 },
                 {
-                  "vec": [
-                    {
-                      "string": "TESTCODE"
-                    }
-                  ]
-                }
+                  "string": "PROMO"
+                },
+                "void"
               ]
             }
           },
@@ -75,7 +72,7 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "redeem_unique",
+              "function_name": "commit_tally",
               "args": [
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -84,10 +81,19 @@
                   "u64": 1
                 },
                 {
-                  "string": "TESTCODE"
+                  "string": "PROMO"
                 },
                 {
-                  "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                  "u64": 1
+                },
+                {
+                  "u32": 5
+                },
+                {
+                  "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
+                },
+                {
+                  "map": []
                 }
               ]
             }
@@ -150,7 +156,7 @@
                         "symbol": "burned"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     },
                     {
@@ -158,7 +164,7 @@
                         "symbol": "discount_type"
                       },
                       "val": {
-                        "string": "fixed_amount"
+                        "string": "percentage"
                       }
                     },
                     {
@@ -166,7 +172,7 @@
                         "symbol": "discount_value"
                       },
                       "val": {
-                        "u64": 500
+                        "u64": 1000
                       }
                     },
                     {
@@ -182,7 +188,7 @@
                         "symbol": "minted"
                       },
                       "val": {
-                        "u32": 1
+                        "u32": 0
                       }
                     },
                     {
@@ -190,7 +196,7 @@
                         "symbol": "name"
                       },
                       "val": {
-                        "string": "Promo"
+                        "string": "UGC"
                       }
                     },
                     {
@@ -206,7 +212,7 @@
                         "symbol": "total_supply"
                       },
                       "val": {
-                        "u32": 10
+                        "u32": 1000
                       }
                     },
                     {
@@ -218,57 +224,6 @@
                       }
                     }
                   ]
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          2678400
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "CodeIndex"
-                },
-                {
-                  "u64": 1
-                },
-                {
-                  "string": "TESTCODE"
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "CodeIndex"
-                    },
-                    {
-                      "u64": 1
-                    },
-                    {
-                      "string": "TESTCODE"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u64": 1
                 }
               }
             },
@@ -333,7 +288,95 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "Token"
+                  "symbol": "Shared"
+                },
+                {
+                  "u64": 1
+                },
+                {
+                  "string": "PROMO"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Shared"
+                    },
+                    {
+                      "u64": 1
+                    },
+                    {
+                      "string": "PROMO"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "attributed_to"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
+                        "symbol": "campaign_id"
+                      },
+                      "val": {
+                        "u64": 1
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "code"
+                      },
+                      "val": {
+                        "string": "PROMO"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "registered_at"
+                      },
+                      "val": {
+                        "u64": 0
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          2678400
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Tally"
+                },
+                {
+                  "u64": 1
+                },
+                {
+                  "string": "PROMO"
                 },
                 {
                   "u64": 1
@@ -353,7 +396,13 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "Token"
+                      "symbol": "Tally"
+                    },
+                    {
+                      "u64": 1
+                    },
+                    {
+                      "string": "PROMO"
                     },
                     {
                       "u64": 1
@@ -365,55 +414,31 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "burned_at"
+                        "symbol": "count"
                       },
                       "val": {
-                        "u64": 0
+                        "u32": 5
                       }
                     },
                     {
                       "key": {
-                        "symbol": "campaign_id"
+                        "symbol": "merkle_root"
                       },
                       "val": {
-                        "u64": 1
+                        "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
                       }
                     },
                     {
                       "key": {
-                        "symbol": "code"
+                        "symbol": "per_attribution"
                       },
                       "val": {
-                        "string": "TESTCODE"
+                        "map": []
                       }
                     },
                     {
                       "key": {
-                        "symbol": "is_burned"
-                      },
-                      "val": {
-                        "bool": true
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "minted_at"
-                      },
-                      "val": {
-                        "u64": 0
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "redeemer_ref"
-                      },
-                      "val": {
-                        "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "token_id"
+                        "symbol": "period"
                       },
                       "val": {
                         "u64": 1
@@ -454,14 +479,6 @@
                       {
                         "key": {
                           "symbol": "camp_ctr"
-                        },
-                        "val": {
-                          "u64": 1
-                        }
-                      },
-                      {
-                        "key": {
-                          "symbol": "tok_ctr"
                         },
                         "val": {
                           "u64": 1
