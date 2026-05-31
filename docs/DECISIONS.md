@@ -76,5 +76,5 @@ Short ADRs capturing the "why." Newest decisions append at the bottom.
 
 ### TODO / unresolved
 - Verify the deployed prototype's mainnet contract address — the donor pitch cited two inconsistent addresses; do not assert either as fact until checked on-chain.
-- Choose a license (Apache-2.0 vs MIT).
-- Decide SEP scope: core primitive as the SEP, settlement as a companion proposal?
+- ~~Choose a license~~ → **Apache-2.0** (see `LICENSE`).
+- SEP: drafted in `docs/SEP.md` (core + Tally + settlement as one standard). Open: confirm whether settlement should be split into a companion proposal before submission.

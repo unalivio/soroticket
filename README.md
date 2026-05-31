@@ -61,4 +61,4 @@ sorodeal/
 
 ## License
 
-TBD — intended to be permissive (Apache-2.0 or MIT) to maximize ecosystem reuse as a public good.
+[Apache-2.0](LICENSE) — a permissive license, to maximize ecosystem reuse as a public good. A candidate SEP draft lives in [`docs/SEP.md`](docs/SEP.md).

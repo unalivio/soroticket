@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Developer playground for the Sorodeal coupon protocol — live on Stellar testnet, signing with Freighter.",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
   },
