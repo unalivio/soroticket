@@ -1,6 +1,6 @@
 # Sorodeal Protocol Spec (draft)
 
-> Status: **draft / design target.** The reference contract in `contracts/coupon-ledger/` now implements the permissionless **Burn** profile of this spec (ADR-002/005); the async **Tally** profile remains design-only.
+> Status: **draft / design target.** The reference contract in `contracts/coupon-ledger/` now implements **both** the permissionless **Burn** and async **Tally** profiles of this spec (ADR-002/005/011), live on Stellar testnet — including per-attribution tally commitments and token settlement.
 
 ## 1. Overview
 
@@ -48,7 +48,7 @@ The cardinality determines the on-chain interaction pattern.
 For **unique** codes. Each redemption is an on-chain transaction that marks the token burned. The contract enforces single-use (`AlreadyRedeemed`) and supply caps at the protocol level. Real-time, low-volume, high-value-per-item.
 
 - **Why on-chain, honestly:** double-use prevention at the point of redemption + supply integrity (cannot oversell seats). These are genuine, real-time guarantees.
-- The reference contract (`contracts/coupon-ledger/`) implements this path, permissionless and PII-free: `create_campaign` → `issue_unique` → `redeem_unique(redeemer_ref_hash)` → `verify`. Each campaign is owned by its creator; the owner or an explicit delegate authorizes redemptions (ADR-007).
+- The reference contract (`contracts/coupon-ledger/`) implements this path, permissionless and PII-free: `create_campaign` → `issue_unique` → `redeem_unique(campaign_id, code, redeemer_ref_hash)` → `verify(campaign_id, code)`. Each campaign is owned by its creator; the owner or an explicit delegate authorizes redemptions (ADR-007).
 
 ### 3.2 Tally (asynchronous)
 
@@ -61,6 +61,7 @@ Instead:
 3. Anyone can audit a claimed count against the committed `merkle_root` by checking inclusion of the underlying receipts. **The tally is verifiable without trusting the operator** — this is what makes attribution trustless.
 
 - **Why on-chain, honestly:** trustless redemption counts + attribution, and a settlement trigger. NOT double-spend.
+- **Implemented** (ADR-011): `register_shared` → `commit_tally(count, merkle_root, per_attribution)` → `get_tally`/`compute_payouts` → `settle` (token payout to attributed addresses).
 
 ## 4. Attribution & settlement
 
@@ -77,11 +78,14 @@ Instead:
 create_campaign(owner: Address, terms: CampaignTerms) -> u64           // require_auth(owner)
 get_campaign(campaign_id: u64) -> Campaign
 campaign_stats(campaign_id: u64) -> CampaignStats
+campaigns_of(owner: Address) -> Vec<u64>                               // public — enumerate an owner's campaigns on-chain (ADR-008)
 
-// Burn profile (unique)
-issue_unique(owner, campaign_id, codes: Vec<String>) -> Vec<u64>       // require_auth(owner) — owner only
-redeem_unique(authorizer, code, redeemer_ref_hash) -> Receipt          // require_auth; owner or delegate; single-use
-verify(code) -> CodeStatus                                             // public, no auth
+// Burn profile (unique) — codes are scoped per campaign (ADR-009)
+issue_unique(owner, campaign_id, codes: Vec<String>) -> Vec<u64>       // require_auth(owner) — owner only; validates terms/batch
+redeem_unique(authorizer, campaign_id, code, redeemer_ref_hash) -> Receipt  // require_auth; owner or delegate; single-use
+verify(campaign_id, code) -> Token                                     // public, no auth
+bump_campaign(campaign_id)                                             // public — extend a campaign's storage TTL (ADR-009)
+bump_codes(campaign_id, codes: Vec<String>)                            // public — extend specific coupons' storage TTL (ADR-009)
 
 // Delegation (Burn) — owner grants/revokes operator redemption rights (ADR-007)
 add_delegate(owner, campaign_id, delegate: Address)                    // require_auth(owner)
@@ -104,7 +108,7 @@ settle(campaign_id, period, asset, rate) -> Vec<Payout>                // pays a
 - `Receipt { code, redeemer_ref_hash, attributed_to, ts, tx_or_nonce }`
 - `TallyCommitment { period, count, merkle_root, per_attribution: Map<Address,u32> }`
 
-**Privacy:** redeemer identity is only ever a salted hash on-chain. No plaintext PII (the donor contract violates this — see DECISIONS).
+**Privacy:** redeemer identity is only ever an **opaque, non-reversible commitment** on-chain — `SHA-256(random nonce ∥ ref)` or `HMAC(merchant pepper, ref)`, never a public-salt hash of a low-entropy identifier (which is brute-forceable). No plaintext PII (ADR-005/010).
 
 ## 6. Open questions
 
