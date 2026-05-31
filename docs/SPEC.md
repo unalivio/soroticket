@@ -103,6 +103,7 @@ get_tally(campaign_id, code, period) -> TallyCommitment                // public
 // Settlement (implemented) — token + rate come from the shared code (immutable; not caller-supplied)
 compute_payouts(campaign_id, code, period) -> Vec<Payout>              // public, read-only preview
 settle(owner, campaign_id, code, period) -> Vec<Payout>                // require_auth(owner); pays attributed_to in payout_token, once per period
+bump_tally(campaign_id, code, periods: Vec<u64>)                       // public — extend a shared code + its periods' storage TTL (ADR-013)
 ```
 
 ### Data structures (target)
