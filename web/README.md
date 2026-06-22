@@ -4,7 +4,11 @@ Interactive developer playground for the Sorodeal coupon protocol — **live on 
 
 ## Run
 
+The playground consumes the local `@sorodeal/sdk` package (wired via
+`file:../sdk/ts`), so build the SDK first:
+
 ```bash
+(cd ../sdk/ts && npm install)   # builds dist/ via the prepare script
 npm install
 npm run dev      # http://localhost:5173
 ```
@@ -23,7 +27,7 @@ npm run preview
 
 ## How it works
 
-- **Real contract.** Every write builds a Soroban transaction, simulates it, is signed by Freighter, and is submitted to the live testnet contract. Reads run as RPC simulations (no signature). Contract: `CA5AFYJEX2DIFMIH3IGBDBEBTIPSRO2W7FJPK6HOP6CLK2FUTQQS44QP` (see `../deployments/testnet.json`).
+- **Real contract.** Every write builds a Soroban transaction, simulates it, is signed by Freighter, and is submitted to the live testnet contract. Reads run as RPC simulations (no signature). Contract: `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX` (see `../deployments/testnet.json`).
 - **No PII on-chain.** The redeemer reference is committed in-browser as an opaque, non-reversible 32-byte `redeemer_ref_hash` = SHA-256(random nonce ∥ reference). A public/constant salt would be brute-forceable for low-entropy refs; the random nonce makes it non-reversible and unlinkable (production may HMAC with a merchant pepper). ADR-005/010.
 - **Chain is the source of truth.** On connect, the app loads your campaigns from the chain via `campaigns_of(owner)` — no localStorage. The seeded *Demo Cafe* (campaign `1`, codes `DEMO0001`/`DEMO0002`) backs the no-wallet Verify demo. Codes are scoped per campaign (ADR-009), so verify/redeem take a campaign id.
 
@@ -34,11 +38,11 @@ npm run preview
 
 ## Architecture
 
-A design export (React, authored for Babel-in-browser with global symbols) runs under Vite via a small globals bridge (`src/globals.js`) so the design files are preserved verbatim. The only rewritten file is `src/store.jsx`, which calls the real Soroban layer in `src/lib/soroban.js` (`@stellar/stellar-sdk` + `@stellar/freighter-api`). Network constants live in `src/data.js` (`SD.NET`).
+A design export (React, authored for Babel-in-browser with global symbols) runs under Vite via a small globals bridge (`src/globals.js`) so the design files are preserved verbatim. The only rewritten file is `src/store.jsx`, which calls the real Soroban layer. That layer lives **once** in `@sorodeal/sdk` (`freighterClient`); `src/lib/soroban.js` is a thin bridge that binds it to `SD.NET` and exposes `window.SDK`. Network constants live in `src/data.js` (`SD.NET`).
 
 | File | Role |
 |---|---|
-| `src/lib/soroban.js` | Real Soroban RPC + Freighter signing → `window.SDK` |
+| `src/lib/soroban.js` | Thin bridge: binds `@sorodeal/sdk`'s `freighterClient` to `SD.NET` → `window.SDK` |
 | `src/store.jsx` | App state + contract calls (context API) → `window.useApp` |
 | `src/data.js` | Testnet constants, error map, CLI/TS/Go snippet generators |
 | `src/*.jsx`, `src/*.css` | Design export (UI), unchanged |

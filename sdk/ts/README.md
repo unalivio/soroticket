@@ -60,6 +60,38 @@ const receipt = (await tx.signAndSend()).result.unwrap();
 `settle` (pays attributed addresses). The off-chain signed-receipt / Merkle
 layer is the integrator's responsibility — see `docs/SPEC.md` §10 (trust model).
 
+## Low-level browser client (`freighterClient`)
+
+The typed `Client` swallows the contract **error code** on simulation (view)
+errors — `(await c.verify(...)).result.unwrapErr()` comes back with an empty
+message instead of `CouponNotFound`. For browser dapps that need precise
+per-error UX, this package also ships a hand-written low-level client that
+surfaces it:
+
+```ts
+import { freighterClient } from "@sorodeal/sdk";
+
+const c = freighterClient({
+  contractId: "C...", rpcUrl: "https://soroban-testnet.stellar.org",
+  networkPassphrase: "Test SDF Network ; September 2015",
+  readSource: "G...", // any funded account; source for read-only sims
+});
+
+try {
+  c.toNative(await c.read("verify", [c.scU64(1n), c.scStr("NOPE")]));
+} catch (e) {
+  e.contractCode; // 2  → look up your friendly message
+}
+
+const { address } = await c.connectWallet();      // Freighter (lazy-loaded)
+const { tx } = await c.registerShared(address, 1, "FALL25", null, null, "10000000");
+```
+
+This is the exact client the developer playground (`web/`) consumes — one
+implementation, no drift. Reads work in Node too (Freighter is only loaded for
+writes/`connectWallet`). The standalone `contractErrorCode(raw)` helper lets
+typed-`Client` users recover the code the bindings drop.
+
 ## Notes
 
 - Token amounts and `u64`/`i128` fields are `bigint` — never coerce to `Number`.
