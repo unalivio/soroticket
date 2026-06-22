@@ -8,17 +8,24 @@ Live testnet contract: `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX
 (wasm `e88e1cda…`, ABI frozen as `contracts/coupon-ledger/abi-v0.1.0.txt`).
 
 ## A · Compacting (in progress)
-- [ ] **Unify the web on `@sorodeal/sdk`** — `web/src/store.jsx` calls the typed
-      client; retire the hand-written `web/src/lib/soroban.js`; wire the local
-      package into Vite. (Build-validated here; browser smoke test = owner.)
-- [ ] **Squash history** (~16 commits → a few clean ones).
+- [x] **Unify the web on `@sorodeal/sdk`** — the low-level client now lives once
+      in the SDK (`freighterClient`, `sdk/ts/src/browser.ts`); `web/src/lib/
+      soroban.js` is a thin bridge binding it to `SD.NET`. Build-validated;
+      browser smoke test = owner.
+- [ ] **Squash history** (now ~17 commits + the Go-SDK/E2E work → a few clean ones).
 - [ ] **Tag `v0.1.0`** on the final state.
 
-## B · Next build
-- [ ] **Go SDK** — hand-written over the Go Stellar SDK: in-process signing,
-      idempotency keys, retries, sequence management (CLAUDE.md gap #2; replaces
-      the donor `reference/botcore-donor/stellar-adapter/client.go`). Off-chain
-      idempotency wrapper (gap #4) lives here.
+## B · Go SDK + E2E (done)
+- [x] **Go SDK** (`sdk/go`, `github.com/sorodeal/sorodeal-go`) — in-process
+      signing over `github.com/stellar/go-stellar-sdk` (Soroban RPC): simulate →
+      assemble (footprint + resource fee + auth) → sign → submit with retries +
+      idempotent re-submission (same envelope) so a retry can't double-burn
+      (CLAUDE.md gaps #2/#4). All 22 methods, typed structs, `*ContractError`
+      codes 1–19. Handles Protocol-23 TransactionMeta **V4** return values.
+- [x] **E2E tester apps** (`tests/e2e/{go,ts}`) — consumer apps importing each
+      SDK; fund ephemeral accounts via friendbot; **50 scenarios** green against
+      live testnet (both profiles, all variants, owner/delegate/stranger,
+      real settlement transfer, every error #1–#19). See `tests/e2e/README.md`.
 
 ## C · Publish / SEP (non-code)
 - [ ] Publish the repo on GitHub (Apache-2.0 allows it).

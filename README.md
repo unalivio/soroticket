@@ -51,10 +51,15 @@ sorodeal/
 │   ├── SCF.md                # Stellar Community Fund tranche/milestone plan
 │   └── DECISIONS.md          # architecture decision records
 ├── deployments/              # on-chain deployment records (testnet.json)
-├── web/                      # developer playground — Vite/React + Freighter (Burn + Tally)
+├── sdk/
+│   ├── ts/                   # @sorodeal/sdk — typed client (generated) + ergonomic wrapper + browser client
+│   └── go/                   # github.com/sorodeal/sorodeal-go — in-process signing over Soroban RPC
+├── tests/
+│   └── e2e/                  # consumer tester apps (go + ts) — 50 scenarios vs live testnet
+├── web/                      # developer playground — Vite/React + Freighter (consumes @sorodeal/sdk)
 └── reference/
     └── botcore-donor/        # reference-only Go from the prototype (does NOT build standalone)
-        ├── stellar-adapter/  # how the contract was invoked (CLI shell-out — to be rewritten with the Go SDK)
+        ├── stellar-adapter/  # how the contract was invoked (CLI shell-out — superseded by sdk/go)
         ├── domain/           # data model: code generation, QR payload, reference numbers
         └── port/             # interface sketches
 ```

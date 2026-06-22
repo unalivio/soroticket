@@ -33,16 +33,16 @@ It is a **public good / standard**, not a SaaS product. Think "like Stellar Disb
 ## Production bar / known gaps to fix (carried from the prototype)
 
 1. **Permissionless redesign** of the contract: campaigns owned by their creator's `Address`; auth by campaign owner, not a global admin.
-2. **Replace the `stellar` CLI shell-out** (`reference/botcore-donor/stellar-adapter/client.go`) with in-process signing via the Go Stellar SDK + Soroban RPC: idempotency keys, retries, sequence management. The CLI was fine for a prototype, not for a standard.
+2. ✅ **Done (`sdk/go`).** Replaced the `stellar` CLI shell-out with in-process signing over the Go Stellar SDK + Soroban RPC: simulate→assemble→sign→submit, retries, per-call sequence management, idempotent re-submission. E2E-validated.
 3. **PII on-chain:** the donor contract stores the redeemer's name in plaintext (`burned_by`). Hash with salt or omit.
-4. **Idempotency** on the off-chain redemption wrapper (network retries must not double-count or double-burn).
+4. ✅ **Done (`sdk/go`).** Idempotent submission: the same signed envelope is re-sent on transient failures, so a network retry can't double-burn (the network dedups by tx hash).
 5. **Verify the deployed prototype address.** The donor pitch (`reference`/BotCore `PITCH_SOROBAN.md`) cited two inconsistent mainnet contract addresses — do not assert one as fact until verified.
 
 ## Stack
 
 - **Contract:** Rust + Soroban SDK (`contracts/coupon-ledger/`). Build/test with the `stellar`/`soroban` CLI and `cargo test`.
-- **SDK (planned):** Go first (reuse donor patterns), TypeScript later for web/mobile integrators.
-- **Settlement (planned):** USDC on Stellar, SDP-style disbursement keyed off committed tallies.
+- **SDKs (built):** `sdk/ts` (`@sorodeal/sdk` — generated typed client + wrapper + low-level browser client) and `sdk/go` (`github.com/sorodeal/sorodeal-go` — in-process signing over Soroban RPC). Both validated by `tests/e2e/{ts,go}` (50 scenarios vs live testnet).
+- **Settlement (implemented):** token payout (SAC) per attributed redemption, keyed off committed tallies; immutable token+rate at registration. E2E-tested with a real native-XLM transfer.
 
 ## Docs
 
