@@ -1,11 +1,22 @@
 # Claude Design prompt — Sorodeal Console
 
-> Paste everything below the line into Claude Design. Attach alongside it:
-> `docs/CLOUD.md` (the API/product spec — the source of truth),
-> `docs/SPEC.md` (protocol), `contracts/coupon-ledger/src/lib.rs` (contract),
-> and `web/src/styles.css` + `web/src/data.js` from the playground (brand DNA).
+> Paste everything below the line into Claude Design, giving it this whole
+> repository as context.
 
 ---
+
+You have the full Sorodeal repository. Ground the design in these files —
+read them before designing:
+
+- `docs/CLOUD.md` — the hosted-platform/API spec. **Source of truth** for
+  screens, entities, credits model, and flows; where this prompt and that spec
+  differ, the spec wins.
+- `docs/SPEC.md` — the protocol (Campaign → Code → Redemption → Settlement).
+- `contracts/coupon-ledger/abi-v0.1.0.txt` — exact data shapes and the 19
+  error names (`src/lib.rs` has the full semantics if needed).
+- `web/src/styles.css` — the playground's design tokens: the brand DNA to
+  carry over. `web/src/data.js` shows the tone of sample data and copy.
+- Ignore `reference/botcore-donor/` (legacy prototype) and `tests/`.
 
 Design **Sorodeal Console** — the self-service web app for Sorodeal Cloud, the
 hosted platform of the Sorodeal protocol (open standard for coupons, vouchers,
