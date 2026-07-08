@@ -27,6 +27,18 @@ Live testnet contract: `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX
       live testnet (both profiles, all variants, owner/delegate/stranger,
       real settlement transfer, every error #1–#19). See `tests/e2e/README.md`.
 
+## C2 · Sorodeal Cloud (new workstream — spec'd, not built)
+- [x] **Platform spec** (`docs/CLOUD.md`): REST API v1, per-org custodial keys,
+      credits ledger + metering (build the meter now, price later), free tier
+      as monthly grant, recharge (card + USDC), TEST/LIVE envs, webhooks,
+      idempotency, TTL keep-alive cron, **loyalty programs** (Tally-anchored
+      punches → auto-issued Burn reward voucher).
+- [x] **Console design prompt** (`docs/design/CONSOLE_DESIGN_PROMPT.md`) — for
+      Claude Design, attach CLOUD.md + SPEC.md + lib.rs + playground styles.
+- [ ] Console design (Claude Design) → export.
+- [ ] Cloud API build in Go over `sorodeal-go` (order in CLOUD.md §6).
+- [ ] Console build against the real API.
+
 ## C · Publish / SEP (non-code)
 - [ ] Publish the repo on GitHub (Apache-2.0 allows it).
 - [ ] Fill SEP placeholders (`docs/SEP.md`): assigned number, author contact,
