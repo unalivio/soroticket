@@ -35,9 +35,14 @@ Live testnet contract: `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX
       punches → auto-issued Burn reward voucher).
 - [x] **Console design prompt** (`docs/design/CONSOLE_DESIGN_PROMPT.md`) — for
       Claude Design, attach CLOUD.md + SPEC.md + lib.rs + playground styles.
-- [ ] Console design (Claude Design) → export.
-- [ ] Cloud API build in Go over `sorodeal-go` (order in CLOUD.md §6).
-- [ ] Console build against the real API.
+- [x] Console design (Claude Design) → imported (`docs/design/export/`).
+- [x] **Cloud API built** (`cloud/api`, Go over `sorodeal-go`) — testnet, both
+      envs; run: `cd cloud/api && go run .` (:8787, data in `cloud/api/data/`).
+- [x] **Console built** (`cloud/console`, Vite/React from the design) — run:
+      `npm run dev` (:5180, proxies /api → :8787). Browser-verified E2E.
+- [ ] Webhook delivery (events already fire internally).
+- [ ] Stripe checkout + automatic USDC recharge crediting.
+- [ ] Mainnet enablement for LIVE (today LIVE = testnet + real metering).
 
 ## C · Publish / SEP (non-code)
 - [ ] Publish the repo on GitHub (Apache-2.0 allows it).
