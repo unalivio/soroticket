@@ -1,0 +1,21 @@
+{
+  "name": "sorodeal-console",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Sorodeal Cloud console — self-service web app over the Cloud API.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4180"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
+  }
+}

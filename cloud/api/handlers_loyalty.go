@@ -95,6 +95,12 @@ func (s *server) handleCreateProgram(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) handleListPrograms(w http.ResponseWriter, r *http.Request) {
 	a := authFrom(r)
+	// collect first, then enrich: with a single SQLite connection, issuing
+	// queries while iterating rows deadlocks (rows holds the only conn)
+	type progRow struct {
+		id, threshold, campID, rval, created int64
+		name, earn, rtype                    string
+	}
 	rows, err := s.db.Query(`SELECT id, name, threshold, campaign_id, earn_code, reward_discount_type,
 	  reward_discount_value, created_at FROM loyalty_programs WHERE org_id = ? AND env = ? ORDER BY id DESC`,
 		a.OrgID, a.Env)
@@ -102,20 +108,23 @@ func (s *server) handleListPrograms(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 500, err.Error())
 		return
 	}
-	defer rows.Close()
-	out := []map[string]any{}
+	progs := []progRow{}
 	for rows.Next() {
-		var id, threshold, campID, rval, created int64
-		var name, earn, rtype string
-		_ = rows.Scan(&id, &name, &threshold, &campID, &earn, &rtype, &rval, &created)
+		var p progRow
+		_ = rows.Scan(&p.id, &p.name, &p.threshold, &p.campID, &p.earn, &p.rtype, &p.rval, &p.created)
+		progs = append(progs, p)
+	}
+	rows.Close()
+	out := []map[string]any{}
+	for _, p := range progs {
 		var punches, customers, rewards, redeemed int64
-		_ = s.db.QueryRow(`SELECT COALESCE(SUM(count),0), COUNT(DISTINCT customer_ref) FROM punches WHERE program_id = ?`, id).
+		_ = s.db.QueryRow(`SELECT COALESCE(SUM(count),0), COUNT(DISTINCT customer_ref) FROM punches WHERE program_id = ?`, p.id).
 			Scan(&punches, &customers)
-		_ = s.db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(redeemed),0) FROM rewards WHERE program_id = ?`, id).
+		_ = s.db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(redeemed),0) FROM rewards WHERE program_id = ?`, p.id).
 			Scan(&rewards, &redeemed)
 		out = append(out, map[string]any{
-			"id": id, "name": name, "threshold": threshold, "campaign_id": campID, "earn_code": earn,
-			"reward_discount_type": rtype, "reward_discount_value": rval, "created_at": created,
+			"id": p.id, "name": p.name, "threshold": p.threshold, "campaign_id": p.campID, "earn_code": p.earn,
+			"reward_discount_type": p.rtype, "reward_discount_value": p.rval, "created_at": p.created,
 			"punches": punches, "customers": customers, "rewards_issued": rewards, "rewards_redeemed": redeemed,
 		})
 	}
@@ -134,22 +143,30 @@ func (s *server) handleGetProgram(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 404, "program not found")
 		return
 	}
-	// customers with punch totals + reward counts
+	// customers with punch totals + reward counts (collect first — see
+	// handleListPrograms for the single-connection deadlock this avoids)
+	type custRow struct {
+		ref           string
+		punches, last int64
+	}
 	rows, _ := s.db.Query(`SELECT customer_ref, SUM(count) as punches, MAX(created_at)
 	  FROM punches WHERE program_id = ? GROUP BY customer_ref ORDER BY punches DESC LIMIT 500`, id)
-	customers := []map[string]any{}
+	custRows := []custRow{}
 	for rows.Next() {
-		var ref string
-		var punches, last int64
-		_ = rows.Scan(&ref, &punches, &last)
-		var rw int64
-		_ = s.db.QueryRow(`SELECT COUNT(*) FROM rewards WHERE program_id = ? AND customer_ref = ?`, id, ref).Scan(&rw)
-		customers = append(customers, map[string]any{
-			"customer_ref": ref, "punches": punches, "progress": punches % threshold,
-			"rewards_earned": rw, "last_punch_at": last,
-		})
+		var cr custRow
+		_ = rows.Scan(&cr.ref, &cr.punches, &cr.last)
+		custRows = append(custRows, cr)
 	}
 	rows.Close()
+	customers := []map[string]any{}
+	for _, cr := range custRows {
+		var rw int64
+		_ = s.db.QueryRow(`SELECT COUNT(*) FROM rewards WHERE program_id = ? AND customer_ref = ?`, id, cr.ref).Scan(&rw)
+		customers = append(customers, map[string]any{
+			"customer_ref": cr.ref, "punches": cr.punches, "progress": cr.punches % threshold,
+			"rewards_earned": rw, "last_punch_at": cr.last,
+		})
+	}
 	rewards := []map[string]any{}
 	rrows, _ := s.db.Query(`SELECT customer_ref, code, issued_at, redeemed FROM rewards WHERE program_id = ? ORDER BY id DESC LIMIT 200`, id)
 	for rrows.Next() {
