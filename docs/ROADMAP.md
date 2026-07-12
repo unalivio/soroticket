@@ -1,66 +1,84 @@
-# Sorodeal — Roadmap / pending work
+# Sorodeal — roadmap and release gates
 
-Status snapshot and the outstanding work, so nothing is lost across history
-rewrites. Current state: contract (Burn + Tally + settlement) audited and
-deployed to testnet, web playground, TS SDK, docs/SEP/license — all committed.
+Status snapshot: 2026-07-11. This file distinguishes working code from design
+targets so the console and documentation do not imply mock features are live.
 
-Live testnet contract: `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX`
-(wasm `e88e1cda…`, ABI frozen as `contracts/coupon-ledger/abi-v0.1.0.txt`).
+## Current artifacts
 
-## A · Compacting (in progress)
-- [x] **Unify the web on `@sorodeal/sdk`** — the low-level client now lives once
-      in the SDK (`freighterClient`, `sdk/ts/src/browser.ts`); `web/src/lib/
-      soroban.js` is a thin bridge binding it to `SD.NET`. Build-validated;
-      browser smoke test = owner.
-- [ ] **Squash history** (now ~17 commits + the Go-SDK/E2E work → a few clean ones).
-- [ ] **Tag `v0.1.0`** on the final state.
+- **Legacy v0.1 testnet:** deployed at
+  `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX`; deprecated and
+  unsafe for new or real-value integrations. It accepts partial attributed
+  tallies and requires an owner signature for each settlement.
+- **Candidate v0.2:** Burn + Tally, exact attribution, allowance-based
+  permissionless settlement, checks-effects-interactions, public settlement
+  state, paged campaign ownership and TTL helpers. Built/tested locally; **not
+  deployed**. See `deployments/candidate-v0.2.0.json`.
+- **SDKs/playground:** updated for the v0.2 ABI, but their compatibility default
+  still names legacy v0.1 until an approved v0.2 deployment exists.
+- **Cloud:** real Go API and React console, but TEST and METERED are both
+  testnet previews over legacy v0.1. Mainnet and real billing are disabled.
 
-## B · Go SDK + E2E (done)
-- [x] **Go SDK** (`sdk/go`, `github.com/sorodeal/sorodeal-go`) — in-process
-      signing over `github.com/stellar/go-stellar-sdk` (Soroban RPC): simulate →
-      assemble (footprint + resource fee + auth) → sign → submit with retries +
-      idempotent re-submission (same envelope) so a retry can't double-burn
-      (CLAUDE.md gaps #2/#4). All 22 methods, typed structs, `*ContractError`
-      codes 1–19. Handles Protocol-23 TransactionMeta **V4** return values.
-- [x] **E2E tester apps** (`tests/e2e/{go,ts}`) — consumer apps importing each
-      SDK; fund ephemeral accounts via friendbot; **50 scenarios** green against
-      live testnet (both profiles, all variants, owner/delegate/stranger,
-      real settlement transfer, every error #1–#19). See `tests/e2e/README.md`.
+## Completed in this security pass
 
-## C2 · Sorodeal Cloud (new workstream — spec'd, not built)
-- [x] **Platform spec** (`docs/CLOUD.md`): REST API v1, per-org custodial keys,
-      credits ledger + metering (build the meter now, price later), free tier
-      as monthly grant, recharge (card + USDC), TEST/LIVE envs, webhooks,
-      idempotency, TTL keep-alive cron, **loyalty programs** (Tally-anchored
-      punches → auto-issued Burn reward voucher).
-- [x] **Console design prompt** (`docs/design/CONSOLE_DESIGN_PROMPT.md`) — for
-      Claude Design, attach CLOUD.md + SPEC.md + lib.rs + playground styles.
-- [x] Console design (Claude Design) → imported (`docs/design/export/`).
-- [x] **Cloud API built** (`cloud/api`, Go over `sorodeal-go`) — testnet, both
-      envs; run: `cd cloud/api && go run .` (:8787, data in `cloud/api/data/`).
-- [x] **Console built** (`cloud/console`, Vite/React from the design) — run:
-      `npm run dev` (:5180, proxies /api → :8787). Browser-verified E2E.
-- [ ] Webhook delivery (events already fire internally).
-- [ ] Stripe checkout + automatic USDC recharge crediting.
-- [ ] Mainnet enablement for LIVE (today LIVE = testnet + real metering).
+- [x] Smart-contract attribution and settlement hardening.
+- [x] O(1) owner campaign index plus bounded pagination.
+- [x] Typed events, generated v0.2 TypeScript binding and frozen ABI.
+- [x] Atomic credit reservation/refund and request-body-bound idempotency.
+- [x] Loyalty concurrency, reward issuance and secure-code fixes.
+- [x] Signed Ed25519 event receipts, Merkle proofs and public audit endpoint.
+- [x] Bounded/paginated audit proofs, receipt batching and public IP rate limit.
+- [x] HMAC business-reference deduplication plus one-shot legacy privacy
+  migration/quarantine (no retroactive fake receipts).
+- [x] Separate reference HMAC key and receipt signer; fail-closed key loading.
+- [x] Session/API security, rate limits, strict JSON and HTTP hardening.
+- [x] Real webhook management/delivery, HMAC signatures, retries and SSRF
+  defenses.
+- [x] Empty playground state; no generated fake campaigns, codes or roots.
+- [x] Recharge endpoint fails with `501 Not Implemented` instead of returning a
+  pretend payment destination.
 
-## C · Publish / SEP (non-code)
-- [ ] Publish the repo on GitHub (Apache-2.0 allows it).
-- [ ] Fill SEP placeholders (`docs/SEP.md`): assigned number, author contact,
-      discussion URL, repo URL.
-- [ ] Fix the web footer `#` links (`web/src/console.jsx`: GitHub / Spec / SEP).
-- [ ] Decide: settlement inside the SEP, or a companion proposal?
-- [ ] Eventually: deploy to mainnet + freeze a mainnet version.
+## Required before a v0.2 testnet release
 
-## D · Polish (nice-to-have)
-- [ ] Code-split the web bundle (the only `npm run build` warning).
-- [ ] Tally UI commit card supports one creator; the full `Map` is in the
-      snippets. Extend if needed.
-- [ ] "Real" settle demo: the seeded `ROBERTOX` pays deployer→deployer (trivial);
-      a moving-funds demo needs a code attributed to a distinct address + a
-      funded token.
-- [ ] Refresh `docs/SCF.md` milestone plan to reflect what's already built.
+- [ ] Review the security report and authorize deployment explicitly.
+- [ ] Deploy the candidate WASM, record the real contract ID/hash and seed only
+  valid examples.
+- [ ] Point SDK, playground and Cloud defaults to that deployment; retire the
+  legacy compatibility alias.
+- [ ] Re-run live E2E tests against the v0.2 contract, including token allowance
+  approval and a third-party keeper settlement.
+- [ ] Publish a signed receipt verifier package/CLI, not only the Cloud endpoint.
 
-## E · Obsolete (close)
-- [ ] DECISIONS TODO "verify the donor prototype's mainnet address" — about the
-      old BotCore prototype, not the current contract. Close as obsolete.
+## Production blockers
+
+- [ ] KMS/HSM-backed custodial and receipt keys, rotation and recovery runbooks.
+- [ ] Email verification, MFA/passkeys, password reset and account recovery.
+- [ ] Durable outbox/reconciliation for the on-chain-write/local-index boundary.
+- [ ] Multi-instance distributed sequence locks, idempotency and rate limiting.
+- [ ] Automated TTL maintenance with dry-run, rent estimates and alerts.
+- [ ] Automated tally scheduling with a published epoch/late-event policy.
+- [ ] Stripe and/or verified USDC deposit confirmation; recharges remain disabled.
+- [ ] Mainnet contract/configuration, asset allowlist, limits, monitoring and an
+  independent external audit.
+- [ ] Data retention/deletion policy, backups and incident-response exercises.
+
+## Console polish (quick wins, non-blocking)
+
+- [ ] Wire a sign-out control to `POST /auth/logout` (endpoint exists; no UI yet).
+- [ ] Loyalty status pill is hardcoded `Active`; derive it (archived/expired
+  programs 409 punches with no UI explanation).
+- [ ] Org switcher / user-avatar buttons are inert; give them a menu or make
+  them non-interactive.
+- [ ] Batch-issue partial success returns HTTP 207 but the toast reports it as a
+  clean success and drops the `error` member.
+- [ ] First-run checklist step 4 ("Get your API key") never marks done.
+
+## Product work after the release gates
+
+- [ ] Public verification API/widget with publishable keys and bounded
+  pagination.
+- [ ] Ticket transfer/ownership extension and seat inventory.
+- [ ] Shared-code global caps and per-redeemer policy enforcement.
+- [ ] Gift-card/stored-value primitive with refund and liability accounting.
+- [ ] Coalition loyalty and cross-merchant settlement.
+- [ ] Configure the real repository/discussion URLs and complete SEP metadata
+  before publication; no remote is configured today.

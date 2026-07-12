@@ -1,161 +1,221 @@
-# Sorodeal Cloud — hosted platform spec (v1 draft)
+# Sorodeal Cloud — implementation status and API v1
 
-The self-service layer on top of the Sorodeal protocol: a **REST API + web
-console** for teams that don't want to run the SDKs or touch a wallet. The
-platform custodies a Stellar account per organization, pays the network fees
-and storage rent on their behalf, and meters usage against a **prepaid credits
-balance** (Apify-style). The protocol stays permissionless and free — this is
-the convenience layer.
+Sorodeal Cloud is the hosted convenience layer over the open contract: a Go
+REST API, SQLite index and React console for teams that do not want to operate a
+wallet or SDK directly.
 
-> Status: design spec. This document is the source of truth for the console
-> design and the backend build. Final decisions become ADRs in DECISIONS.md.
+> Status (2026-07-11): working **testnet preview**, not production. TEST is free
+> and METERED exercises the credit ledger, but both use the deprecated v0.1
+> testnet contract. Mainnet, production billing, automatic TTL maintenance and
+> automatic tally scheduling are disabled.
 
----
+## 1. Implemented architecture
 
-## 1. Architecture
-
-```
-┌────────────┐     ┌───────────────────────────────┐     ┌──────────────────┐
-│  Console   │────▶│  Cloud API (Go)               │────▶│ Soroban testnet/  │
-│ (web SPA)  │     │  · auth: sessions + API keys  │     │ mainnet contract  │
-└────────────┘     │  · tenancy + custodial keys   │     └──────────────────┘
-┌────────────┐     │  · credits ledger + metering  │
-│ Integrator │────▶│  · TTL keep-alive cron        │
-│ (REST)     │     │  · webhooks + idempotency     │
-└────────────┘     │  · uses sdk/go (sorodeal-go)  │
-                   └───────────────────────────────┘
+```text
+Console / integrator
+        |
+        v
+Cloud API (Go) ---- SQLite/WAL index, receipts, credits, idempotency
+        |
+        v
+Stellar testnet ---- legacy contract v0.1
 ```
 
-- **Backend: Go**, consuming `sorodeal-go` (dogfooding the SDK).
-- **One custodial Stellar keypair per organization**, encrypted at rest (KMS).
-  All the org's campaigns are owned on-chain by that address, so everything the
-  platform does for a tenant is publicly auditable, and a future **key export /
-  non-custodial migration** is possible (the org takes its address with it).
-- **Two environments, Stripe-style:** every org gets *test mode* (testnet,
-  free forever, `sk_test_…` keys) and *live mode* (mainnet, metered,
-  `sk_live_…` keys). One toggle in the console switches everything.
-- The platform pays all network fees + storage rent; that cost is what the
-  credit metering recovers.
+- One encrypted custodial Stellar seed per organization and environment.
+- A separate encrypted Ed25519 receipt-signing seed per organization and
+  environment.
+- A dedicated HMAC key creates stable opaque customer/order commitments; it is
+  not coupled to encryption-key rotation.
+- Local v1 encryption uses AES-GCM with 0600 key files. Invalid/missing key
+  material fails closed. **This is not a production KMS.**
+- Cloud serializes writes per org/environment inside one process. It is not yet
+  safe for a horizontally scaled deployment.
 
-## 2. Tenancy & auth
+Upgrade note: migration v1 forces a one-time logout because legacy raw session
+tokens cannot be distinguished safely from new digests. It HMACs historical
+plaintext `order_ref` values. Pre-audit events are preserved with
+`committed_period = -1` but quarantined rather than retroactively signed;
+legacy committed tallies without receipts return `410 Gone` from the audit
+route. When an old loyalty customer next appears, the known legacy hash is
+moved to the new HMAC identity, but the unsigned historical event remains
+quarantined. Pre-upgrade idempotency fingerprints also fail closed with `409`
+instead of being replayed under the new keyed format. Operators should
+export/reconcile these rows explicitly.
 
-| Concept | Shape |
+## 2. Authentication and request rules
+
+- Console: email/password plus an 8-hour `HttpOnly`, `SameSite=Lax` session;
+  only a SHA-256 digest of the bearer is stored. Maximum five active sessions.
+- **Identity roadmap (planned, not implemented):** the email/password form is a
+  placeholder identity until a real provider lands. Planned, in order:
+  transactional email provider → email verification + password recovery →
+  magic-link sign-in → OAuth/SSO (Google, GitHub) and social login → MFA
+  (TOTP) → org roles/RBAC and team invites. Nothing in the current schema
+  blocks this: `users` is keyed by email and sessions are provider-agnostic,
+  so adding `auth_identities` (provider, subject, user_id) is additive.
+- API: `Authorization: Bearer sk_test_…` or `sk_metered_…`; only a digest is stored
+  and keys are revocable.
+- Session mutations enforce same-origin/fetch-metadata checks. Login and signup
+  have independent abuse limits.
+- Authenticated limits are 300 writes/minute and 1,200 reads/minute per
+  principal. Responses include `X-RateLimit-*` and `Retry-After` when blocked.
+- JSON mutations require `Content-Type: application/json`, reject unknown
+  fields/multiple JSON values and cap bodies at 1 MiB.
+- `Idempotency-Key` is optional but strongly recommended for supported
+  authenticated v1 mutations.
+  It is scoped by org/environment/endpoint, bound to method/path/body, reserved
+  before execution and retained for 24 hours. A response is acknowledged only
+  after its replay result is stored. Reusing a key with different input returns
+  `409`.
+- Shared events may carry `order_ref`; loyalty punches may carry `event_ref`.
+  Cloud HMACs these values and enforces uniqueness inside their code/program,
+  so changing the HTTP idempotency key cannot count the same referenced event
+  twice. Omitting the business reference opts out of this second layer.
+
+## 3. Implemented endpoints
+
+All routes below require session/API-key authentication unless marked public.
+
+| Area | Methods and routes |
 |---|---|
-| **Organization** | The tenant. Has: name, custodial Stellar account (per env), credits balance, plan. |
-| **User** | Email + password (magic-link later). Belongs to one org v1; teams later. |
-| **API key** | `sk_test_…` / `sk_live_…`, hashed at rest, label, last-used, revocable. Multiple per org. |
-| **Publishable key** | `pk_…` — allowed only on public reads (`verify`) for client-side widgets. Later. |
+| Auth | `POST /auth/signup`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /orgs` |
+| Overview | `GET /v1/overview`, `GET /v1/activity` |
+| Campaigns | `POST/GET /v1/campaigns`, `GET /v1/campaigns/{id}`, `POST /v1/campaigns/{id}/archive` |
+| Burn | `POST /v1/campaigns/{id}/codes`, `GET /v1/verify`, `POST/GET /v1/redemptions` |
+| Tally | `POST /v1/campaigns/{id}/shared-codes`, `POST /v1/shared-codes/{cid}/{code}/events`, `POST /v1/shared-codes/{cid}/{code}/commits`, `GET/POST /v1/settlements` |
+| Loyalty | `POST/GET /v1/loyalty/programs`, `GET /v1/loyalty/programs/{id}`, `POST /v1/loyalty/programs/{id}/punches` |
+| Platform | `GET/POST /v1/keys`, `POST /v1/keys/{id}/revoke`, `GET /v1/credits`, `GET /v1/usage` |
+| Webhooks | `GET/POST /v1/webhooks`, `POST /v1/webhooks/{id}/disable`, `POST /v1/webhooks/{id}/test` |
+| Public audit | `GET /v1/audit/tallies/{chain_id}/{code}/{period}` |
 
-API auth: `Authorization: Bearer sk_live_…`. Console auth: session cookie.
-All POSTs accept an **`Idempotency-Key` header** (stored 24h; same key ⇒ same
-response — no double-issues, no double-redeems on retries).
+`POST /v1/credits/recharges` deliberately returns `501 Not Implemented`. It
+does not issue a payment address or credit a balance.
 
-## 3. Credits, metering, tiers
+Lists currently use fixed server limits rather than cursor pagination. The
+Cloud `verify` route is authenticated; public verification remains available
+directly through the contract/playground. Do not advertise either as a
+publishable-key API yet.
 
-**Credits are a prepaid balance.** 1,000 credits = $1 (PLACEHOLDER — calibrate
-against real testnet/mainnet cost measurements before launch). Every metered
-operation debits the ledger atomically with the operation itself.
+Archiving is an off-chain Cloud control: it blocks new issues, redemptions,
+shared-code registrations, shared events and loyalty punches through Cloud,
+while allowing retrospective tally commits and settlements. Expiry also blocks
+new shared events/punches. Archive does not modify or preserve existing Soroban
+state.
 
-**Price table (PLACEHOLDER values — the shape is what matters):**
+Cloud pins the legacy contract ID explicitly. Its current settlement is signed
+by the custodial campaign owner and uses v0.1's direct token transfer; Cloud
+does not create an unused token allowance. A future v0.2 migration must be
+explicitly capability-gated and approve only the exact period amount before
+calling the allowance-based settlement.
 
-| Operation | Credits | Why |
-|---|---|---|
-| Reads (`verify`, stats, lists) | 0 | Simulations are ~free for us; keep the API friction-less. |
-| Create campaign | 20 | On-chain write + storage. |
-| Issue unique codes | 2 / code | Batched writes; per-code storage. |
-| Redeem (burn) | 5 | On-chain write. |
-| Register shared code | 10 | On-chain write. |
-| Record shared-code event (off-chain) | 0.2 | DB + later anchoring amortized. |
-| Commit tally / settle | 15 / 25 | On-chain write; settle moves tokens. |
-| Loyalty punch | 0.2 | Off-chain, anchored periodically. |
-| **Campaign keep-alive** | 30 / campaign / month | TTL rent (`bump_*`) — the real recurring on-chain cost. |
+## 4. Credits and metering
 
-**Tiers:**
+Credits use integer millicredits (`1 cr = 1,000 mcr`). METERED reserves credits
+before an operation and records refunds if the action fails; a conditional SQL
+update prevents concurrent overdrafts. A refund that cannot reach SQLite is
+currently logged but has no durable retry, another reason this is preview-only.
+TEST is unmetered.
 
-| Tier | v1 | Future |
-|---|---|---|
-| **Free** | Monthly grant (e.g. 25,000 credits ≈ $25 PLACEHOLDER), non-accumulating. Test mode unlimited. Generous enough for a real integrator pilot. | Stays; grant tuned by real costs. |
-| **Pay-as-you-go** | Exists in the model from day one (recharge works), even if we top everyone up manually during the free period. | Card (Stripe) + **USDC on Stellar** recharges (on-brand: pay the platform through the same rail it settles on). |
-| **Pro / Scale** | — | Included-credit bundles, volume discounts, SLA, teams, custom limits. |
+The current table and the monthly 25,000-credit grant are **preview values**, not
+real-money pricing. No payment processor exists. The console and API expose:
 
-**Design principle: build the meter now, price later.** The ledger, price
-table, and recharge flow all exist in v1; the free period is just a monthly
-grant on top of the same machinery.
+| Operation | Preview price |
+|---|---:|
+| Create campaign | 20 cr |
+| Issue unique code | 2 cr/code |
+| Redeem unique code | 5 cr |
+| Register shared code | 10 cr |
+| Record shared event | 0.2 cr/event |
+| Commit tally | 15 cr |
+| Settle | 25 cr |
+| Loyalty punch | 0.2 cr/punch |
 
-Ledger entry: `{ts, api_key, operation, campaign_id?, credits_delta, balance_after, tx_hash?}` — the
-console renders this as both a usage dashboard and an auditable statement.
+No TTL keep-alive charge exists because the maintenance worker is not
+implemented.
 
-## 4. REST API v1
+## 5. Signed receipts and Merkle audit
 
-Base: `https://api.sorodeal.org/v1` (PLACEHOLDER domain). JSON. Errors are
-`application/problem+json` and **pass through the contract error verbatim**:
-`{status, code: 3, name: "AlreadyRedeemed", message, tx_hash?}` — same 19 codes
-as the protocol.
+Recording a shared event or loyalty punch produces canonical JSON:
 
-### Campaigns
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/campaigns` | `{kind: coupon\|voucher\|ticket\|loyalty, name, discount_type, discount_value, total_supply, valid_until}`. `kind` is presentation-level (the contract sees one primitive). |
-| GET | `/campaigns` · `/campaigns/{id}` | Includes on-chain stats + `stellar_expert_url`. |
-| GET | `/campaigns/{id}/stats` | minted / burned / available / expired. |
+```json
+{
+  "version": 1,
+  "campaign_id": 42,
+  "code": "SAVE10",
+  "count": 1,
+  "customer_commitment": "optional HMAC hex",
+  "order_commitment": "optional HMAC hex",
+  "timestamp": 1783790000,
+  "nonce": "32 hex chars",
+  "signer": "G..."
+}
+```
 
-### Unique codes (Burn — coupons, vouchers, tickets)
-| POST | `/campaigns/{id}/codes` | `{codes: […]}` or `{generate: {count, prefix?}}`. Auto-chunks (contract max 100/batch). Returns codes + QR payloads. |
-| GET | `/campaigns/{id}/codes` | With status filter. |
-| GET | `/verify?campaign_id&code` | **Public read.** Token status; never leaks unissued codes. |
-| POST | `/redemptions` | `{campaign_id, code, redeemer_ref?}`. The platform computes the opaque commitment (random nonce ∥ ref → SHA-256; ADR-005/010) — **no PII on-chain, ever**. Returns the receipt: `{token_id, discount, burned_at, ledger_seq, tx_hash}`. |
-| GET | `/redemptions?campaign_id` | Timeline. |
+The signer signs the exact UTF-8 JSON bytes with Ed25519. `leaf_hash` is
+`SHA-256(payload)` and the signature is standard Base64. Parent nodes are
+`SHA-256(left || right)`; an unpaired odd node is promoted unchanged.
 
-### Shared codes (Tally — general + creator/attributed)
-| POST | `/campaigns/{id}/shared-codes` | `{code, attributed_to?, payout?: {token, rate}}` — payout config immutable (ADR-012). |
-| POST | `/shared-codes/{cid}/{code}/events` | Off-chain redemption event(s): `{count?, customer_ref?, order_ref?}`. This is the hot path (0-ish cost). |
-| POST | `/shared-codes/{cid}/{code}/commits` | `{period}` — platform computes count + Merkle root from recorded events and commits on-chain. Auto-commit schedule configurable (e.g. weekly). |
-| GET | `/shared-codes/{cid}/{code}/tallies` | Committed periods, auditable. |
-| POST | `/settlements` | `{campaign_id, code, period}` → pays the attributed address `count × rate` from the org's custodial account. |
+The public audit endpoint checks the global receipt count, recomputes the root
+from every stored leaf hash, and re-hashes/verifies the payload, signature,
+metadata and inclusion proof for each receipt in the requested page. Pages use
+`cursor` plus `limit` (default/max 100) and the public route is limited to 30
+requests/minute per source IP. One tally contains at most 10,000 signed
+receipts; if more are pending, a commit anchors the first batch and returns
+`remaining_receipts`. The first batch uses `YYYYWW`; additional batches in the
+same ISO week use `YYYYWW01` through `YYYYWW99`, so they can be committed
+immediately without colliding with the append-only period key.
 
-### Loyalty (built on the same primitive)
-A **program** = earn side (Tally-anchored punches) + reward side (Burn voucher).
+This proves that the published receipt set matches the on-chain commitment. It
+does **not** prove an off-chain purchase was genuine; the
+organization-controlled signer remains the trust anchor for that fact.
 
-| POST | `/loyalty/programs` | `{name, threshold, reward: {discount_type, discount_value, validity_days}}`. Creates the earn anchor (shared code) + the reward campaign (Burn). |
-| POST | `/loyalty/programs/{id}/punches` | `{customer_ref, count?}`. `customer_ref` is merchant-side and stored only as an opaque hash (same PII rule). |
-| GET | `/loyalty/programs/{id}/customers` | Punch counts, progress, rewards earned. |
-| GET | `/loyalty/programs/{id}` | Program stats: punches, rewards issued/redeemed. |
+## 6. Loyalty behavior
 
-When a customer crosses `threshold`, the platform **auto-issues a unique
-voucher** on the reward campaign and fires `loyalty.reward_issued`. The voucher
-then lives the normal Burn life (verify / redeem / receipt). Punch history is
-anchored on-chain per period (count + Merkle root) so a program's totals are
-auditable; per-customer balances stay off-chain (customers aren't Stellar
-addresses). A fully-trustless per-customer profile is a candidate **contract
-v0.2 / SEP extension**.
+A loyalty program creates a shared earn code and a Burn reward campaign.
+Punches are serialized per program. When cumulative punches cross one or more
+thresholds, Cloud issues exactly the number of rewards owed, on-chain first,
+then commits the local punch/reward rows in one transaction. Reward codes use
+12 cryptographically random characters.
 
-### Platform
-| GET | `/usage?group_by=day\|operation\|key` | Metering rollups for charts. |
-| GET | `/credits` | `{balance, monthly_grant, ledger: […]}`. |
-| POST | `/credits/recharges` | `{amount_usd, method: card\|usdc}` → card = Stripe checkout; usdc = payment address + memo, credited on confirmation. |
-| POST/GET | `/webhooks` | Endpoints + secret; events HMAC-signed. Events: `redemption.created`, `tally.committed`, `settlement.paid`, `loyalty.reward_issued`, `credits.low`. |
+`event_ref` is optional but recommended for POS integrations. A duplicate
+reference returns `409` before a new punch; in the single-process preview the
+program lock and database uniqueness protect the check. Multi-instance safety
+still requires distributed coordination/outbox work.
 
-Rate limits per key (headers `X-RateLimit-*`). Cursor pagination everywhere.
+Per-customer balances are off-chain HMAC commitments. Only aggregate signed
+receipts are anchored. This is not a fully trustless customer balance.
 
-## 5. Ops invariants (carried from the protocol work)
+## 7. Webhooks
 
-- **Idempotent submission** end-to-end: API `Idempotency-Key` at the edge +
-  same-envelope re-submission at the Soroban layer (sdk/go) — a retry can never
-  double-burn or double-charge credits.
-- **TTL keep-alive cron**: bumps every live campaign/code/tally inside its
-  window; the keep-alive meter line recovers this cost. A campaign the org
-  archives stops being bumped (and stops charging).
-- **Custody**: org keypairs in KMS, never in app memory longer than a signing
-  call; distribution/fee float account separate from tenant accounts; all
-  tenant actions auditable on-chain under the org's address.
-- Mainnet deploys use a dedicated deployer identity — never a personal one.
+Supported events are `redemption.created`, `tally.committed`,
+`settlement.paid`, `loyalty.reward_issued` and `credits.low`.
 
-## 6. Build order
+- At most 20 active endpoints per environment.
+- Public HTTPS port 443 only; credentials, fragments, redirects, proxies,
+  private/link-local/shared/benchmark IPs and DNS rebinding to blocked IPs are
+  rejected.
+- Payloads are signed as
+  `HMAC-SHA256(secret, timestamp + "." + raw_body)` in
+  `X-Sorodeal-Signature: v1=<hex>`.
+- Delivery ID, event type and timestamp are sent in `X-Sorodeal-*` headers.
+- Envelopes always declare `network: "testnet"`, `production: false`,
+  `livemode: false` and public mode `test`/`metered`; internal DB mode `live`
+  remains only for backward compatibility.
+- Non-2xx responses retry with backoff up to eight attempts.
+- The signing secret is returned once; only an encrypted copy and display
+  prefix remain.
 
-1. **Spec freeze** (this doc) → console design (Claude Design) in parallel.
-2. API skeleton: orgs/auth/keys + campaigns/codes/redemptions on **testnet**.
-3. Metering ledger + usage endpoints (free tier = monthly grant).
-4. Tally + settlement endpoints; webhooks.
-5. Loyalty programs.
-6. Console build against the real API.
-7. Mainnet enablement + recharges (Stripe + USDC).
+Consumers must reject stale timestamps and deduplicate delivery IDs.
+
+## 8. Explicitly not implemented / production blockers
+
+- Mainnet and a reviewed v0.2 deployed contract.
+- Stripe checkout or a verified USDC deposit watcher.
+- KMS/HSM custody, key export, rotation workflow and recovery.
+- MFA/passkeys, email verification and password reset.
+- Automatic TTL bumping and automatic tally commit schedules.
+- Durable outbox/reconciliation when a chain write succeeds but the local
+  SQLite update fails.
+- Multi-instance locks, distributed rate limiting and distributed idempotency.
+- Cursor pagination and a publishable-key/public verification surface.
+- Retention/deletion controls, backup validation and production observability.

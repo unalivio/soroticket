@@ -1,39 +1,41 @@
 # Sorodeal
 
-**An open protocol for tokenized coupons, vouchers, and redeemable codes on Stellar Soroban — with verifiable attribution and automatic settlement.**
+**An open protocol and hosted suite for coupons, vouchers, tickets and loyalty on Stellar Soroban — with signed audit receipts and token settlement.**
 
-Sorodeal is a public-good **standard** (not a product) for issuing and redeeming "deals" on-chain: classic promo codes, creator/affiliate codes, referral codes, and unique event tickets — all as one primitive, with on-chain proof of every redemption and optional USDC payout per conversion.
+Sorodeal combines a permissionless contract, Go/TypeScript SDKs, a developer playground and a hosted Cloud API. Burn redemptions are recorded individually on-chain; high-volume shared-code events stay off-chain as signed receipts and are periodically anchored by a Merkle root. Attributed tallies may pay a configured Stellar asset.
 
-> **Status: early.** The reference Soroban contract was donated from a working WhatsApp prototype (BotCore) and is being reshaped from a single-admin design into a **permissionless standard**. Targeting the Stellar Community Fund (SCF) as a milestone-based grant, with a geolocated social network as the first design partner.
+> **Security status (2026-07-11):** the immutable testnet v0.1 deployment is deprecated because it permits creator underpayment and requires owner-authorized settlement. Contract v0.2 is built and tested locally, but **has not been deployed**. Cloud's TEST/METERED previews still use legacy v0.1 and neither environment is production or mainnet. See `deployments/` and `docs/SECURITY_AUDIT_2026-07-11.md`.
 
 ## Why this exists
 
 Coupons today are either paper (forgeable, unauditable) or locked inside closed SaaS platforms. There is no open standard where:
 
 - a merchant can issue a deal that **anyone** can verify,
-- a creator/referrer can **prove** how many redemptions they drove without trusting the brand's dashboard,
-- and they get **paid per conversion automatically** in USDC.
+- a creator/referrer can verify that published signed receipts are included in an immutable tally commitment,
+- and an approved token allowance can be settled without another owner signature on v0.2.
 
-Stellar's sub-cent fees + native USDC + Soroban make per-conversion payouts economically viable for the first time. **That is the "why Stellar."** (Not "tamper-proof double-spend prevention" — that argument is weak for shared codes; see `docs/DECISIONS.md`.)
+Stellar's low fees, asset model and Soroban make small-value settlement practical. For shared codes, the contract prevents commitment changes and attribution underpayment; it does **not** prove that an off-chain purchase was genuine. The receipt signer remains that trust anchor. See `docs/SPEC.md`.
 
 ## One primitive, not three
 
-The "different kinds of coupons" are a single primitive with policy knobs — cardinality (code→redemptions) × attribution × per-user limits:
+The product family shares a core primitive. This table distinguishes what is
+implemented from policy extensions that still require design and code:
 
-| Use case | Code → redemptions | Attribution | Redemption profile |
+| Use case | Code → redemptions | Profile | Status |
 |---|---|---|---|
-| Delivery promo (`SUPERBOWL10`) | 1 → many | no | Tally (async) |
-| Creator / UGC code (`ROBERTOX`) | 1 → many | yes (creator) | Tally + payout |
-| Referral (P2P) | 1 per user → many | yes (referrer) | Tally + payout |
-| Event ticket / unique voucher | many × (1 → 1) | optional | Burn (sync) |
-| Geo-drop / proof-of-presence | unique or capped | optional | Burn (sync) + geofence |
+| Delivery promo (`SUPERBOWL10`) | 1 → many | Tally | Candidate v0.2 + Cloud preview |
+| Creator / UGC code (`ROBERTOX`) | 1 → many, fixed attribution | Tally + payout | Candidate v0.2 + Cloud preview |
+| Event ticket / unique voucher | many × (1 → 1) | Burn | Candidate v0.2 + Cloud preview |
+| Loyalty threshold → reward | shared punches + unique rewards | Tally + Burn | Cloud preview; customer ledger is off-chain |
+| Referral with once-per-user rules | 1 per user → many | Tally + payout | Planned; anti-fraud/reversals absent |
+| Geo-drop / proof-of-presence | unique or capped | Burn + geofence | Planned; geofence absent |
 
 Spec nouns: **Campaign → Code → Redemption → Settlement.**
 
 ## Two redemption profiles
 
 - **Burn (synchronous):** unique single-use tokens. One on-chain tx per redemption. Best for tickets and high-value vouchers — real-time double-use prevention "at the door." *(Implemented.)*
-- **Tally (asynchronous):** shared multi-use codes. Hot path off-chain; periodic on-chain commitment of redemption counts + attribution via Merkle-anchored receipts, with binding attribution and token settlement. Cheap at scale and the basis for trustless creator payouts. *(Implemented — ADR-011.)*
+- **Tally (asynchronous):** shared multi-use codes. Hot path off-chain; periodic on-chain commitment of signed receipt hashes and exact attributed counts. Cheap at scale and tamper-evident after commitment. *(Implemented in candidate v0.2; Cloud publishes receipt proofs.)*
 
 ## Repo layout
 
@@ -48,14 +50,13 @@ sorodeal/
 │       └── test_snapshots/
 ├── docs/
 │   ├── SPEC.md               # the protocol spec (the real design target)
-│   ├── SCF.md                # Stellar Community Fund tranche/milestone plan
 │   └── DECISIONS.md          # architecture decision records
 ├── deployments/              # on-chain deployment records (testnet.json)
 ├── sdk/
 │   ├── ts/                   # @sorodeal/sdk — typed client (generated) + ergonomic wrapper + browser client
 │   └── go/                   # github.com/sorodeal/sorodeal-go — in-process signing over Soroban RPC
 ├── tests/
-│   └── e2e/                  # consumer tester apps (go + ts) — 50 scenarios vs live testnet
+│   └── e2e/                  # consumer tester apps; historical scenarios target legacy testnet v0.1
 ├── web/                      # developer playground — Vite/React + Freighter (consumes @sorodeal/sdk)
 └── reference/
     └── botcore-donor/        # reference-only Go from the prototype (does NOT build standalone)

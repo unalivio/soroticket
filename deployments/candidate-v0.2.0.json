@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "status": "built-and-tested-not-deployed",
+  "networkTarget": "testnet",
+  "deployed": false,
+  "builtAt": "2026-07-11",
+  "validatedAt": "2026-07-12",
+  "sorobanSdk": "27.0.0",
+  "wasmHash": "1c6c74f2f43c60aa06939d6e63c49a1809c98a7cebd9555453a4297c5f04c94b",
+  "wasmSizeBytes": 31245,
+  "exportedFunctions": 25,
+  "abi": "../contracts/coupon-ledger/abi-v0.2.0.txt",
+  "replaces": "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX",
+  "securityChanges": [
+    "Attributed tally count must equal the committed total.",
+    "Permissionless settlement consumes a bounded token allowance pre-approved by the campaign owner.",
+    "Settlement records its guard before external token calls (checks-effects-interactions).",
+    "Settlement state is publicly queryable with is_settled.",
+    "Delegate TTL entries can be maintained with bump_delegates.",
+    "Owner campaign indexing is O(1) with bounded campaigns_page reads.",
+    "Events use the typed contractevent schema."
+  ],
+  "deploymentNote": "Deploy and reseed only after explicit operator approval; this file is not evidence of an on-chain deployment."
+}

@@ -1,5 +1,9 @@
 # Claude Design prompt — Sorodeal Console
 
+> Archived design input. The implemented console is the source of truth; this
+> prompt contains aspirational flows and must not be used as a feature-status
+> document.
+
 > Paste everything below the line into Claude Design, giving it this whole
 > repository as context.
 
@@ -12,7 +16,7 @@ read them before designing:
   screens, entities, credits model, and flows; where this prompt and that spec
   differ, the spec wins.
 - `docs/SPEC.md` — the protocol (Campaign → Code → Redemption → Settlement).
-- `contracts/coupon-ledger/abi-v0.1.0.txt` — exact data shapes and the 19
+- `contracts/coupon-ledger/abi-v0.2.0.txt` — candidate data shapes and the 19
   error names (`src/lib.rs` has the full semantics if needed).
 - `web/src/styles.css` — the playground's design tokens: the brand DNA to
   carry over. `web/src/data.js` shows the tone of sample data and copy.
@@ -20,8 +24,8 @@ read them before designing:
 
 Design **Sorodeal Console** — the self-service web app for Sorodeal Cloud, the
 hosted platform of the Sorodeal protocol (open standard for coupons, vouchers,
-event tickets and loyalty programs on Stellar Soroban, with verifiable
-attribution and automatic USDC settlement).
+event tickets and loyalty programs on Stellar Soroban, with signed audit
+receipts and allowance-based token settlement).
 
 The audience is a **merchant or growth/ops person, not a crypto user**. They
 sign up with email, get an API key, and create coupons — the blockchain is an
@@ -68,8 +72,8 @@ and "shared codes".
   Loyalty · API Keys · Usage & Credits · Webhooks · Settings. Docs link at
   bottom.
 - Top bar: org switcher (name + custodial address truncated), **environment
-  toggle TEST / LIVE** (Stripe-style; TEST tints a thin top border amber with
-  a "Test mode — testnet, free" label; LIVE is the default chrome), credits
+  toggle TEST / METERED** (both testnet previews; METERED exercises credits),
+  credits
   balance chip (mono, e.g. `18,540 cr`), user menu.
 - Every on-chain object shows a small `↗ stellar.expert` link.
 - All state-changing errors surface the contract's error name in a friendly
@@ -101,8 +105,8 @@ unique/ticket: supply + code generation pattern; loyalty: punches to reward +
 reward discount + validity); step 3 review → Create. Detail page: stats header
 (minted/redeemed/available, expiry countdown), tabs: Codes · Redemptions ·
 Settlement (shared only) · Activity. Codes tab: batch issue modal (paste list
-or generate N, chunk note), QR per code, CSV export. Archive action (stops
-keep-alive charges — copy explains this).
+or generate N, chunk note), QR per code, CSV export. Archive action. Automated
+TTL keep-alive and billing are explicitly not implemented.
 
 **4 · Redemptions.** Live table across campaigns: code (mono), campaign,
 result badge (Redeemed green / rejected reason red), redeemer ref (opaque hash,
