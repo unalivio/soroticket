@@ -47,15 +47,18 @@ export function Shell({ children }) {
             </button>
           ))}
         </nav>
-        <a className="side-link" href="https://github.com/sorodeal" target="_blank" rel="noreferrer">
-          <Ic.doc />Docs<span style={{ marginLeft: "auto", color: "var(--ink-3)" }}>↗</span>
-        </a>
+        <div className="side-link" title="Local repository: docs/CLOUD.md and docs/SPEC.md">
+          <Ic.doc />Docs<span className="mono" style={{ marginLeft: "auto", color: "var(--ink-3)", fontSize: 10 }}>repo</span>
+        </div>
       </aside>
 
       <div className="main">
-        {env === "test" && <>
+        {env === "test" ? <>
           <div className="test-strip" />
-          <div className="test-banner">Test mode — testnet, free. Nothing here touches mainnet.</div>
+          <div className="test-banner">Test mode — deprecated v0.1 testnet contract, free. Candidate v0.2 is not deployed; nothing touches mainnet.</div>
+        </> : <>
+          <div className="test-strip" />
+          <div className="test-banner">Metered preview — deprecated v0.1 testnet contract. Candidate v0.2, mainnet and production billing are disabled.</div>
         </>}
         <div className="topbar2">
           <button className="org-btn">
@@ -67,10 +70,10 @@ export function Shell({ children }) {
           <div style={{ flex: 1 }} />
           <div className="env-toggle">
             <span className={"env-opt" + (env === "test" ? " on-test" : "")} onClick={() => setEnv("test")}>TEST</span>
-            <span className={"env-opt" + (env === "live" ? " on-live" : "")} onClick={() => setEnv("live")}>LIVE</span>
+            <span className={"env-opt" + (env === "live" ? " on-live" : "")} onClick={() => setEnv("live")}>METERED</span>
           </div>
           <span className="credits-chip mono" style={env === "test" ? { color: "var(--ink-2)" } : undefined}>
-            {env === "test" ? "testnet · free" : <><Ic.coins width={13} height={13} style={{ color: "var(--ink-2)" }} />{credits == null ? "…" : fmtCr(credits) + " cr"}</>}
+            {env === "test" ? "testnet · free" : <><Ic.coins width={13} height={13} style={{ color: "var(--ink-2)" }} />testnet · {credits == null ? "…" : fmtCr(credits) + " cr"}</>}
           </span>
           <span className="user-dot">{userInitials}</span>
         </div>

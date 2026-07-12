@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { api, fmtCr, fmtTime } from "../api.js";
+import { api, fmtCr, fmtTime, fmtUnits } from "../api.js";
 import { useApp } from "../store.jsx";
 import { BtnPrimary, Ic, Kpi, Pill, TxLink } from "../ui.jsx";
 
@@ -113,7 +113,7 @@ export function OverviewPage() {
       <div className="page-head">
         <div>
           <h1 className="display" style={{ fontSize: 27, margin: 0 }}>Overview</h1>
-          <p className="page-sub">{env === "test" ? "Test data is separate from live — experiments stay here." : `${today} · all campaigns`}</p>
+          <p className="page-sub">{env === "test" ? "TEST data is separate from METERED — experiments stay here." : `${today} · all campaigns`}</p>
         </div>
         <div style={{ display: "flex", gap: 9 }}>
           <button className="btn-plain" style={{ fontSize: 13.5 }} onClick={() => nav("/campaigns")}>Issue codes</button>
@@ -132,7 +132,7 @@ export function OverviewPage() {
               <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 3 }}>test mode is never metered</div>
             </div>
           : <Kpi label="Credits balance" value={<>{fmtCr(data.credits_mcr ?? 0)} <span style={{ fontSize: 14, color: "var(--ink-3)", fontWeight: 500 }}>cr</span></>} mono sub="25,000 cr free each month" />}
-        <Kpi label="Settled to creators" value={<>{data.settled_total.toFixed(2)} <span style={{ fontSize: 17, color: "var(--ink-3)" }}>{data.settled_unit}</span></>} />
+        <Kpi label="Settled to creators" value={<>{fmtUnits(data.settled_total_base_units)} <span style={{ fontSize: 17, color: "var(--ink-3)" }}>{data.settled_unit}</span></>} />
       </div>
 
       {isFirstRun

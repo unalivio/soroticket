@@ -1,6 +1,6 @@
 /* API keys · Usage & credits · Webhooks · Settings */
 import React, { useEffect, useState } from "react";
-import { api, fmtCr, fmtDate, fmtDateTime, trunc } from "../api.js";
+import { api, fmtCr, fmtDate, fmtDateTime, idemKey, trunc } from "../api.js";
 import { useApp } from "../store.jsx";
 import { BtnPrimary, CopyMono, Empty, ErrText, Ic, Modal, Pill } from "../ui.jsx";
 
@@ -10,33 +10,35 @@ export function ApiKeysPage() {
   const [data, setData] = useState(null);
   const [create, setCreate] = useState(false);
   const [snippet, setSnippet] = useState("curl");
+  const keyMode = env === "live" ? "metered" : "test";
 
   const load = () => api.get("/v1/keys").then(setData).catch(() => {});
   useEffect(() => { setData(null); load(); }, [env]);
 
   const revoke = async (id) => {
-    try { await api.post(`/v1/keys/${id}/revoke`); toast("Key revoked", "Requests with it now return 401."); load(); }
+    try { await api.postIdem(`/v1/keys/${id}/revoke`, {}, idemKey()); toast("Key revoked", "Requests with it now return 401."); load(); }
     catch (e) { toastErr(e); }
   };
 
   const snippets = {
-    curl: `# redeem a unique code — 5 cr, ~5s to on-chain finality
+    curl: `# redeem a unique code — preview testnet; waits for chain confirmation
 curl -X POST http://127.0.0.1:8787/v1/redemptions \\
-  -H "Authorization: Bearer sk_${env}_…" \\
-  -H "Idempotency-Key: 8f2e51c0-4b7d" \\
-  -d '{ "campaign_id": 4, "code": "BURN-9D4X", "redeemer_ref": "order #58291" }'
-
-→ 201  { "receipt": { "token_id": 38, "ledger_seq": 51203441, … } }`,
+  -H "Authorization: Bearer sk_${keyMode}_…" \\
+  -H "Idempotency-Key: <new-uuid-per-operation>" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "campaign_id": 4, "code": "BURN-9D4X", "redeemer_ref": "order #58291" }'`,
     TypeScript: `const res = await fetch("http://127.0.0.1:8787/v1/redemptions", {
   method: "POST",
-  headers: { Authorization: "Bearer sk_${env}_…", "Idempotency-Key": crypto.randomUUID() },
+  headers: { Authorization: "Bearer sk_${keyMode}_…", "Idempotency-Key": crypto.randomUUID(), "Content-Type": "application/json" },
   body: JSON.stringify({ campaign_id: 4, code: "BURN-9D4X", redeemer_ref: "order #58291" }),
 });
 const { receipt } = await res.json(); // token_id, ledger_seq, tx…`,
     Go: `req, _ := http.NewRequest("POST", api+"/v1/redemptions", body)
-req.Header.Set("Authorization", "Bearer sk_${env}_…")
+req.Header.Set("Authorization", "Bearer sk_${keyMode}_…")
 req.Header.Set("Idempotency-Key", uuid.NewString()) // retries can't double-burn
-resp, err := http.DefaultClient.Do(req)`,
+req.Header.Set("Content-Type", "application/json")
+client := &http.Client{Timeout: 15 * time.Second}
+resp, err := client.Do(req)`,
   };
 
   return (
@@ -44,7 +46,7 @@ resp, err := http.DefaultClient.Do(req)`,
       <div className="page-head">
         <div>
           <h1 className="display" style={{ fontSize: 27, margin: 0 }}>API keys</h1>
-          <p className="page-sub">Bearer keys, hashed at rest · all POSTs accept an <span className="mono" style={{ fontSize: 12 }}>Idempotency-Key</span></p>
+          <p className="page-sub">Bearer keys, hashed at rest · mutating v1 routes accept an <span className="mono" style={{ fontSize: 12 }}>Idempotency-Key</span></p>
         </div>
         <BtnPrimary small icon={<Ic.plus width={13} height={13} />} onClick={() => setCreate(true)}>Create key</BtnPrimary>
       </div>
@@ -56,7 +58,7 @@ resp, err := http.DefaultClient.Do(req)`,
           </div>
           {data.keys.map((k) => (
             <div key={k.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1.8fr 1fr 1fr .8fr", gap: 14, padding: "13px 20px", borderBottom: "1px solid var(--line)", alignItems: "center", opacity: k.revoked ? 0.5 : 1 }}>
-              <span style={{ fontSize: 13.5, fontWeight: 650 }}>{k.label}{k.env === "test" && <span className="authtag" style={{ marginLeft: 6 }}>test</span>}</span>
+              <span style={{ fontSize: 13.5, fontWeight: 650 }}>{k.label}<span className="authtag" style={{ marginLeft: 6 }}>{k.mode || k.env}</span></span>
               <span className="mono" style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{k.prefix}</span>
               <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{fmtDate(k.created_at)}</span>
               <span style={{ fontSize: 12.5, color: k.last_used_at ? "var(--valid)" : "var(--ink-3)", fontWeight: k.last_used_at ? 600 : 400 }}>
@@ -107,7 +109,7 @@ function CreateKeyModal({ onClose }) {
 
   const submit = async () => {
     setBusy(true); setErr(null);
-    try { setCreated(await api.post("/v1/keys", { label })); }
+    try { setCreated(await api.postIdem("/v1/keys", { label }, idemKey())); }
     catch (e) { setErr(e); } finally { setBusy(false); }
   };
 
@@ -121,7 +123,7 @@ function CreateKeyModal({ onClose }) {
           </div>
           <div className="field">
             <label>Label</label>
-            <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Production server" autoFocus onKeyDown={(e) => e.key === "Enter" && submit()} />
+            <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Backend integration" autoFocus onKeyDown={(e) => e.key === "Enter" && submit()} />
           </div>
           <ErrText err={err} />
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 9 }}>
@@ -154,10 +156,9 @@ function CreateKeyModal({ onClose }) {
 
 /* ── Usage & credits ──────────────────────────────────────────────── */
 export function UsagePage() {
-  const { env, org, toast } = useApp();
+  const { env } = useApp();
   const [credits, setCredits] = useState(null);
   const [usage, setUsage] = useState(null);
-  const [recharge, setRecharge] = useState(false);
 
   useEffect(() => {
     setCredits(null);
@@ -172,9 +173,9 @@ export function UsagePage() {
       <div className="page-head">
         <div>
           <h1 className="display" style={{ fontSize: 27, margin: 0 }}>Usage & credits</h1>
-          <p className="page-sub">{env === "test" ? "Test mode is never metered — every operation is free here." : "Prepaid credits · 1,000 cr = $1 · introductory pricing"}</p>
+          <p className="page-sub">{env === "test" ? "Test mode is never metered — every operation is free here." : "Preview ledger · nominal 1,000 cr = $1 · payments/recharges disabled"}</p>
         </div>
-        {env === "live" && <BtnPrimary small icon={<Ic.coins width={13} height={13} />} onClick={() => setRecharge(true)}>Recharge</BtnPrimary>}
+        {env === "live" && <Pill kind="pending">Billing disabled · testnet preview</Pill>}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
@@ -198,14 +199,14 @@ export function UsagePage() {
       <div className="card" style={{ overflow: "hidden" }}>
         <div style={{ padding: "16px 20px 12px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
           <span style={{ fontSize: 14, fontWeight: 650 }}>Credit ledger</span>
-          <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>reads like a bank statement</span>
+          <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>append-only preview usage ledger</span>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr 2fr 1fr 1fr", gap: 12, padding: "9px 20px", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", background: "var(--surface-inset)" }}>
           {["When", "Operation", "Detail", "Δ credits", "Balance"].map((h, i) => <span key={i} className="eyebrow" style={{ fontSize: 11 }}>{h}</span>)}
         </div>
         {(credits.ledger || []).length === 0 && (
           <div style={{ padding: "22px 20px", textAlign: "center" }}>
-            <span className="mono" style={{ fontSize: 12, color: "var(--ink-3)" }}>{env === "test" ? "Test operations aren't metered — switch to LIVE to see the ledger." : "No metered operations yet."}</span>
+            <span className="mono" style={{ fontSize: 12, color: "var(--ink-3)" }}>{env === "test" ? "Test operations aren't metered — switch to METERED to exercise the ledger." : "No metered operations yet."}</span>
           </div>
         )}
         {(credits.ledger || []).map((l, i) => (
@@ -230,76 +231,94 @@ export function UsagePage() {
               <span className="mono">{p.mcr === 0 ? "free" : `${fmtCr(p.mcr)} cr${p.per ? " / " + p.per : ""}`}</span>
             </div>
           ))}
-          <p className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)", margin: "10px 0 0" }}>Introductory — the free tier covers typical pilots. Campaign keep-alive: 30 cr / month (archiving stops it).</p>
+          <p className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)", margin: "10px 0 0" }}>Preview pricing only. Automated campaign keep-alive and its billing are not enabled yet.</p>
         </div>
       </details>
 
-      {recharge && <RechargeModal onClose={() => setRecharge(false)} />}
     </div>
   );
 }
 
-function RechargeModal({ onClose }) {
-  const [amount, setAmount] = useState(25);
-  const [info, setInfo] = useState(null);
-  const [busy, setBusy] = useState(false);
+/* ── Webhooks ─────────────────────────────────────────────────────── */
+export function WebhooksPage() {
+  const { env, toast, toastErr } = useApp();
+  const [data, setData] = useState(null);
+  const [create, setCreate] = useState(false);
+  const load = () => api.get("/v1/webhooks").then(setData).catch(toastErr);
+  useEffect(() => { setData(null); load(); }, [env]);
 
-  const go = async () => {
-    setBusy(true);
-    try { setInfo(await api.post("/v1/credits/recharges", { amount_usd: amount, method: "usdc" })); }
-    finally { setBusy(false); }
+  const action = async (id, name) => {
+    try {
+      await api.postIdem(`/v1/webhooks/${id}/${name}`, {}, idemKey());
+      toast(name === "test" ? "Test queued" : "Endpoint disabled", name === "test" ? "Delivery status will update shortly." : "No new events will be delivered.");
+      setTimeout(load, name === "test" ? 900 : 0);
+    } catch (e) { toastErr(e); }
   };
 
   return (
-    <Modal onClose={onClose} width={460}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontSize: 16, fontWeight: 650 }}>Recharge credits</div>
-        {!info ? <>
-          <div style={{ display: "flex", gap: 8 }}>
-            {[10, 25, 50, 100].map((a) => (
-              <button key={a} className="btn-plain" onClick={() => setAmount(a)}
-                style={{ flex: 1, justifyContent: "center", fontSize: 14, ...(amount === a ? { borderColor: "var(--ink)", boxShadow: "0 0 0 3px var(--accent-wash)" } : {}) }}>
-                ${a}
-              </button>
-            ))}
-          </div>
-          <div className="mono" style={{ fontSize: 12.5, color: "var(--ink-2)", textAlign: "center" }}>${amount} → {(amount * 1000).toLocaleString()} cr</div>
-          <BtnPrimary busy={busy} onClick={go} style={{ justifyContent: "space-between", width: "100%" }}>Pay with USDC on Stellar</BtnPrimary>
-          <p style={{ fontSize: 12, color: "var(--ink-3)", margin: 0, textAlign: "center" }}>Card checkout arrives with billing — during the free period your monthly grant covers usage.</p>
-        </> : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <p style={{ fontSize: 13, color: "var(--ink-2)", margin: 0, lineHeight: 1.5 }}>{info.message}</p>
-            <div style={{ background: "var(--surface-inset)", border: "1px solid var(--line)", borderRadius: 12, padding: "13px 15px", display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--ink-3)" }}>Address</span><CopyMono value={info.usdc.address} display={trunc(info.usdc.address, 8, 6)} /></div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--ink-3)" }}>Memo</span><CopyMono value={info.usdc.memo} /></div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}><span style={{ color: "var(--ink-3)" }}>Credits</span><span className="mono">{info.usdc.credits.toLocaleString()} cr</span></div>
-            </div>
-            <BtnPrimary small icon={<Ic.check width={13} height={13} />} onClick={onClose} style={{ alignSelf: "flex-end" }}>Done</BtnPrimary>
-          </div>
-        )}
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <h1 className="display" style={{ fontSize: 27, margin: 0 }}>Webhooks</h1>
+          <p className="page-sub">HMAC-SHA256 signed · HTTPS only · automatic retries</p>
+        </div>
+        <BtnPrimary small icon={<Ic.plus width={13} height={13} />} onClick={() => setCreate(true)}>Add endpoint</BtnPrimary>
       </div>
-    </Modal>
+
+      {data && data.webhooks.length === 0 && <Empty icon={<Ic.zap width={20} height={20} />} title="No endpoints yet">
+        Subscribe an HTTPS endpoint to receive redemption, tally, settlement and loyalty events.
+      </Empty>}
+
+      {data && data.webhooks.length > 0 && <div className="card" style={{ overflow: "hidden" }}>
+        {data.webhooks.map((hook) => <div key={hook.id} style={{ padding: "16px 20px", borderBottom: "1px solid var(--line)", display: "grid", gridTemplateColumns: "2fr 2fr 1fr auto", gap: 14, alignItems: "center", opacity: hook.active ? 1 : .55 }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="mono" style={{ fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis" }}>{hook.url}</div>
+            <div className="mono" style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 3 }}>{hook.secret_prefix}</div>
+          </div>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>{hook.events.map((event) => <span key={event} className="authtag">{event}</span>)}</div>
+          <div><Pill kind={hook.last_status === "delivered" ? "valid" : hook.last_status === "failed" ? "burned" : "pending"}>{hook.last_status}</Pill></div>
+          <div style={{ display: "flex", gap: 7 }}>
+            {hook.active && <button className="btn-plain" style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => action(hook.id, "test")}>Test</button>}
+            {hook.active && <button className="btn-plain" style={{ fontSize: 12, padding: "6px 10px", color: "var(--burned)" }} onClick={() => action(hook.id, "disable")}>Disable</button>}
+          </div>
+        </div>)}
+      </div>}
+
+      <div className="card" style={{ padding: "16px 20px", fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6 }}>
+        Verify <span className="mono">X-Sorodeal-Signature</span> over <span className="mono">timestamp + "." + raw_body</span>, reject stale timestamps, and deduplicate with <span className="mono">X-Sorodeal-Delivery</span>.
+      </div>
+      {create && <CreateWebhookModal events={data?.supported_events || []} onClose={(changed) => { setCreate(false); if (changed) load(); }} />}
+    </div>
   );
 }
 
-/* ── Webhooks (v1: documented, delivery lands next) ───────────────── */
-export function WebhooksPage() {
-  return (
-    <div className="page">
-      <div className="page-head"><div>
-        <h1 className="display" style={{ fontSize: 27, margin: 0 }}>Webhooks</h1>
-        <p className="page-sub">HMAC-signed events for your backend</p>
-      </div></div>
-      <Empty icon={<Ic.zap width={20} height={20} />} title="Delivery is on the way">
-        The events already fire internally — <span className="mono" style={{ fontSize: 12 }}>redemption.created</span>,{" "}
-        <span className="mono" style={{ fontSize: 12 }}>tally.committed</span>,{" "}
-        <span className="mono" style={{ fontSize: 12 }}>settlement.paid</span>,{" "}
-        <span className="mono" style={{ fontSize: 12 }}>loyalty.reward_issued</span>,{" "}
-        <span className="mono" style={{ fontSize: 12 }}>credits.low</span>. Endpoint registration and signed delivery
-        ship in the next release; today, poll <span className="mono" style={{ fontSize: 12 }}>GET /v1/activity</span>.
-      </Empty>
-    </div>
-  );
+function CreateWebhookModal({ events, onClose }) {
+  const [url, setURL] = useState("");
+  const [selected, setSelected] = useState(() => new Set(events));
+  const [created, setCreated] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const toggle = (event) => setSelected((current) => {
+    const next = new Set(current); next.has(event) ? next.delete(event) : next.add(event); return next;
+  });
+  const submit = async () => {
+    setBusy(true); setErr(null);
+    try { setCreated(await api.postIdem("/v1/webhooks", { url, events: [...selected] }, idemKey())); }
+    catch (e) { setErr(e); } finally { setBusy(false); }
+  };
+  return <Modal onClose={() => onClose(!!created)} width={560}>
+    {!created ? <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div><div style={{ fontSize: 16, fontWeight: 650 }}>Add webhook endpoint</div><div style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 2 }}>Public HTTPS endpoints only; redirects and private network destinations are blocked.</div></div>
+      <div className="field"><label>Endpoint URL</label><input className="input mono" value={url} onChange={(e) => setURL(e.target.value)} placeholder="https://example.com/sorodeal/webhooks" autoFocus /></div>
+      <div className="field"><label>Events</label><div style={{ display: "flex", flexDirection: "column", gap: 7 }}>{events.map((event) => <label key={event} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5 }}><input type="checkbox" checked={selected.has(event)} onChange={() => toggle(event)} /><span className="mono">{event}</span></label>)}</div></div>
+      <ErrText err={err} />
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 9 }}><button className="btn-plain" onClick={() => onClose(false)}>Cancel</button><BtnPrimary small busy={busy} onClick={submit}>Create endpoint</BtnPrimary></div>
+    </div> : <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div><div style={{ fontSize: 16, fontWeight: 650 }}>Copy the signing secret now</div><div style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 2 }}>Only an encrypted copy is kept; the console will not reveal it again.</div></div>
+      <div style={{ background: "var(--con-bg)", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", gap: 10 }}><span className="mono" style={{ fontSize: 12.5, color: "var(--con-ink)", wordBreak: "break-all", flex: 1 }}>{created.webhook.secret}</span><button className="btn-plain" onClick={() => navigator.clipboard?.writeText(created.webhook.secret)}>Copy</button></div>
+      <BtnPrimary small onClick={() => onClose(true)} style={{ alignSelf: "flex-end" }}>Done</BtnPrimary>
+    </div>}
+  </Modal>;
 }
 
 /* ── Settings ─────────────────────────────────────────────────────── */
@@ -316,7 +335,7 @@ export function SettingsPage() {
       <div className="card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span style={{ fontSize: 14, fontWeight: 650 }}>Your Stellar account · {env}</span>
-          <span className="authtag"><Ic.lock width={11} height={11} />custodial — key export coming later</span>
+          <span className="authtag"><Ic.lock width={11} height={11} />custodial · export unavailable in preview</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <CopyMono value={account?.public_key || ""} display={account?.public_key} size={13} />
@@ -324,23 +343,22 @@ export function SettingsPage() {
             href={`https://stellar.expert/explorer/testnet/account/${account?.public_key}`}>↗ stellar.expert</a>
         </div>
         <p style={{ fontSize: 12.5, color: "var(--ink-2)", margin: 0, lineHeight: 1.55 }}>
-          Sorodeal holds this key for you and pays network fees + storage; you spend prepaid credits.
-          Every campaign, code and settlement your org creates is publicly auditable under this address.
+          This preview holds the key and submits testnet network/storage operations; METERED deducts non-monetary preview credits.
+          Campaign and settlement state is inspectable under this address. Shared-event claims additionally require the published signed receipts and Merkle proofs.
         </p>
       </div>
 
       <div className="card" style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
         <span style={{ fontSize: 14, fontWeight: 650 }}>Environments</span>
         <p style={{ fontSize: 12.5, color: "var(--ink-2)", margin: 0, lineHeight: 1.55 }}>
-          <strong>TEST</strong> and <strong>LIVE</strong> keep separate data, separate Stellar accounts and separate API keys.
-          Test is free forever. <span className="mono" style={{ fontSize: 11.5 }}>Note: during the pilot, LIVE also runs on
-          Stellar testnet (with real metering) — it moves to mainnet when the protocol deploys there.</span>
+          <strong>TEST</strong> and <strong>METERED</strong> keep separate data, Stellar accounts and API keys.
+          Both currently run on Stellar testnet; METERED only exercises the credit ledger. Mainnet is not enabled.
         </p>
       </div>
 
       <div className="card" style={{ padding: "20px 24px", borderColor: "color-mix(in oklch, var(--burned) 30%, var(--line))" }}>
         <span style={{ fontSize: 14, fontWeight: 650, color: "var(--burned)" }}>Danger zone</span>
-        <p style={{ fontSize: 12.5, color: "var(--ink-2)", margin: "6px 0 0" }}>Deleting an organization is not available from the console — contact us.</p>
+        <p style={{ fontSize: 12.5, color: "var(--ink-2)", margin: "6px 0 0" }}>Organization deletion and a verified data-erasure workflow are not implemented in this preview.</p>
       </div>
     </div>
   );

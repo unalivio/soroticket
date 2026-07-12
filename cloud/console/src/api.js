@@ -48,7 +48,32 @@ export const fmtCr = (mcr) => {
   return cr.toLocaleString(undefined, { maximumFractionDigits: cr < 10 ? 1 : 0 });
 };
 
-export const fmtUnits = (base) => (Number(base) / 1e7).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const decimalToBaseUnits = (input, decimals = 7) => {
+  const raw = String(input ?? "").trim();
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(raw);
+  if (!match || decimals < 0 || decimals > 18) throw new RangeError("Enter a non-negative decimal amount.");
+  const fraction = match[2] || "";
+  if (fraction.length > decimals) throw new RangeError(`Amount supports at most ${decimals} decimal places.`);
+  const scale = 10n ** BigInt(decimals);
+  const fractional = fraction.padEnd(decimals, "0") || "0";
+  return (BigInt(match[1]) * scale + BigInt(fractional)).toString();
+};
+
+export const fmtUnits = (base) => {
+  try {
+    const value = BigInt(base ?? 0);
+    const negative = value < 0n;
+    const absolute = negative ? -value : value;
+    // Seven base-unit decimals → two display decimals, rounded half-up without
+    // ever passing through an imprecise JavaScript Number.
+    const hundredths = (absolute + 50_000n) / 100_000n;
+    const whole = hundredths / 100n;
+    const fraction = (hundredths % 100n).toString().padStart(2, "0");
+    return `${negative ? "-" : ""}${whole.toLocaleString()}.${fraction}`;
+  } catch {
+    return "—";
+  }
+};
 
 export const fmtTime = (ts) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 export const fmtDate = (ts) => new Date(ts * 1000).toLocaleDateString([], { month: "short", day: "numeric" });

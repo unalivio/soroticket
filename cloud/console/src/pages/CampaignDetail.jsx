@@ -28,8 +28,8 @@ export function CampaignDetailPage({ id }) {
 
   const archive = async () => {
     try {
-      await api.post(`/v1/campaigns/${id}/archive`);
-      toast("Archived", "Keep-alive stopped — codes stay verifiable on-chain.");
+      await api.postIdem(`/v1/campaigns/${id}/archive`, {}, idemKey());
+      toast("Archived", "New Cloud issues, redemptions and events are blocked; existing chain state is unchanged.");
       load();
     } catch (e) { toastErr(e); }
   };
@@ -73,7 +73,7 @@ export function CampaignDetailPage({ id }) {
               <div><div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>Available</div><div className="display" style={{ fontSize: 34 }}>{c.minted - c.burned}</div></div>
             </> : <>
               <div><div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>Code</div><div className="mono" style={{ fontSize: 28, fontWeight: 600 }}>{c.shared_code}</div></div>
-              <div><div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>Events counted</div><div className="display" style={{ fontSize: 34 }}>{(c.events_30d || 0).toLocaleString()}</div></div>
+              <div><div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>Events counted</div><div className="display" style={{ fontSize: 34 }}>{(c.events_total || 0).toLocaleString()}</div></div>
               {c.attributed_to && <div><div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>Creator</div><div className="mono" style={{ fontSize: 15, paddingBottom: 8 }}>{trunc(c.attributed_to)}</div></div>}
             </>}
             <div style={{ flex: 1 }} />
@@ -82,10 +82,15 @@ export function CampaignDetailPage({ id }) {
               <div className="display" style={{ fontSize: 22, paddingBottom: 4 }}>in {expiresDays} days <span style={{ fontSize: 14, color: "var(--ink-3)" }}>· {fmtDate(c.valid_until)}</span></div>
             </div>
           </div>
+          {c.legacy_unsigned_events > 0 && (
+            <div style={{ background: "var(--pending-bg)", color: "var(--pending)", borderRadius: 10, padding: "10px 13px", fontSize: 12.5 }}>
+              {c.legacy_unsigned_events.toLocaleString()} pre-audit events are preserved but quarantined: they have no historical signature and cannot be presented as signed receipts. Export/reconcile them explicitly.
+            </div>
+          )}
           {unique && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div className="progressbar" style={{ height: 6 }}><span style={{ width: `${pct}%` }} /></div>
-              <div className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{pct}% redeemed · archiving stops the 30 cr / month keep-alive — codes stay verifiable on-chain</div>
+              <div className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{pct}% redeemed · archive blocks new Cloud operations but does not alter existing on-chain state or TTL</div>
             </div>
           )}
         </div>
@@ -209,11 +214,7 @@ function IssueModal({ c, onClose }) {
   const remaining = c.total_supply - c.minted;
   const n = mode === "generate" ? Number(count) || 0 : pasted.split(/[\s,]+/).filter(Boolean).length;
 
-  const preview = useMemo(() => {
-    const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-    const rnd = () => Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
-    return Array.from({ length: 4 }, () => `${prefix ? prefix + "-" : ""}${rnd()}${rnd().slice(0, 0)}`);
-  }, [prefix]);
+  const codeFormat = `${prefix ? prefix + "-" : ""}XXXXXXXXXXXX`;
 
   const submit = async () => {
     setBusy(true); setErr(null);
@@ -254,10 +255,10 @@ function IssueModal({ c, onClose }) {
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}>Preview</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}>Generated format</span>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {preview.map((p, i) => <span key={i} className="mono" style={{ fontSize: 12, background: "var(--surface-inset)", border: "1px dashed var(--line-2)", borderRadius: 7, padding: "3px 9px" }}>{p}</span>)}
-              {n > 4 && <span className="mono" style={{ fontSize: 12, color: "var(--ink-3)", padding: "3px 2px" }}>+ {n - 4} more</span>}
+              <span className="mono" style={{ fontSize: 12, background: "var(--surface-inset)", border: "1px dashed var(--line-2)", borderRadius: 7, padding: "3px 9px" }}>{codeFormat}</span>
+              <span className="mono" style={{ fontSize: 12, color: "var(--ink-3)", padding: "3px 2px" }}>actual values are generated securely by the API</span>
             </div>
           </div>
         </> : (
@@ -290,9 +291,13 @@ function EventsModal({ c, onClose }) {
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
+      const parsedCount = Number(count);
+      if (!Number.isSafeInteger(parsedCount) || parsedCount < 1 || parsedCount > 10_000) {
+        throw new RangeError("Conversions must be an integer between 1 and 10,000.");
+      }
       const r = await api.postIdem(`/v1/shared-codes/${c.id}/${c.shared_code}/events`,
-        { count: Number(count) || 1, order_ref: orderRef }, idemKey());
-      toast(`+${count} events recorded`, `${r.pending_events} pending for the next on-chain anchor.`);
+        { count: parsedCount, order_ref: orderRef }, idemKey());
+      toast(`+${parsedCount} events recorded`, r.pending_events === undefined ? "Signed receipt stored." : `${r.pending_events} pending for the next on-chain anchor.`);
       onClose(true);
     } catch (e) { setErr(e); setBusy(false); }
   };
@@ -312,6 +317,7 @@ function EventsModal({ c, onClose }) {
         <div className="field">
           <label>Order reference <span style={{ fontWeight: 500, color: "var(--ink-3)" }}>optional</span></label>
           <input className="input" value={orderRef} onChange={(e) => setOrderRef(e.target.value)} placeholder="ORD-1001" />
+          <span className="help">Use a stable order ID to reject duplicate counting even if another idempotency key is used.</span>
         </div>
         <ErrText err={err} />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 9 }}>

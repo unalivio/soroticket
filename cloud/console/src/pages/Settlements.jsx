@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { api, fmtUnits, trunc } from "../api.js";
+import { api, fmtUnits, idemKey, trunc } from "../api.js";
 import { useApp } from "../store.jsx";
 import { BtnPrimary, ErrText, Ic, Modal, Pill, TxLink } from "../ui.jsx";
 
@@ -26,15 +26,16 @@ export function SettlementsPage() {
   const current = codes.find((c) => `${c.id}:${c.shared_code}` === sel) || codes[0];
   const rows = (data?.settlements || []).filter((s) => !current || (s.campaign_id === current.id && s.code === current.shared_code));
   const payable = rows.filter((s) => !s.settled && s.attributed_count > 0);
-  const settledTotal = rows.filter((s) => s.settled).reduce((acc, s) => acc + Number(s.payout_amount || 0), 0);
-  const pendingEvents = current?.events_30d || 0;
+  const settledTotal = rows.filter((s) => s.settled).reduce((acc, s) => acc + BigInt(s.payout_amount || 0), 0n);
+  const pendingEvents = current?.pending_events || 0;
 
   const commitNow = async () => {
     if (!current) return;
     setCommitBusy(true);
     try {
-      const r = await api.post(`/v1/shared-codes/${current.id}/${current.shared_code}/commits`, {});
-      toast("Tally committed", `${r.period_label} · ${r.count} events anchored with Merkle root ${trunc(r.merkle_root, 6, 6)}.`);
+      const r = await api.postIdem(`/v1/shared-codes/${current.id}/${current.shared_code}/commits`, {}, idemKey());
+      const remaining = r.remaining_receipts > 0 ? ` ${r.remaining_receipts} signed receipts remain for another period.` : "";
+      toast(r.remaining_receipts > 0 ? "Tally batch committed" : "Tally committed", `${r.period_label} · ${r.count} conversions from ${r.receipt_count} signed receipts anchored with Merkle root ${trunc(r.merkle_root, 6, 6)}.${remaining}`);
       load();
     } catch (e) { toast(e.code ? `#${e.code} ${e.name}` : "Commit failed", e.message, "error"); }
     finally { setCommitBusy(false); }
@@ -131,7 +132,7 @@ export function SettlementsPage() {
             </span>
             {!s.settled && s.attributed_count > 0
               ? <BtnPrimary small style={{ justifySelf: "end" }} onClick={() => setConfirm(s)}>Settle</BtnPrimary>
-              : <span style={{ justifySelf: "end" }}><TxLink hash={s.settle_tx} /></span>}
+              : <span style={{ justifySelf: "end" }}><TxLink hash={s.settle_tx || s.commit_tx} /></span>}
           </div>
         ))}
         {rows.length === 0 && pendingEvents === 0 && (
@@ -141,7 +142,7 @@ export function SettlementsPage() {
         )}
       </div>
       <p className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)", margin: 0 }}>
-        Each period's count is anchored with a Merkle root — the creator can verify their numbers on-chain without trusting this dashboard.
+        The public audit endpoint publishes signed receipts and proofs for the committed root. It detects changes to the receipt set; the merchant signer still attests that each off-chain event was genuine.
       </p>
 
       {confirm && <SettleConfirm s={confirm} onClose={(done) => { setConfirm(null); if (done) load(); }} />}
@@ -158,7 +159,7 @@ function SettleConfirm({ s, onClose }) {
   const settle = async () => {
     setBusy(true); setErr(null);
     try {
-      const r = await api.post("/v1/settlements", { campaign_id: s.campaign_id, code: s.code, period: s.period });
+      const r = await api.postIdem("/v1/settlements", { campaign_id: s.campaign_id, code: s.code, period: s.period }, idemKey());
       toast("Settled ✓", `${fmtUnits(r.total)} ${r.unit} paid on-chain to ${trunc(s.attributed_to)}.`);
       onClose(true);
     } catch (e) { setErr(e); setBusy(false); }

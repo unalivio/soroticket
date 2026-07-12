@@ -24,7 +24,7 @@ export function AppProvider({ children }) {
   const setEnv = useCallback((e) => { persistEnv(e); setEnvState(e); }, []);
 
   const toast = useCallback((title, msg, type = "success") => {
-    const id = Math.random();
+    const id = crypto.randomUUID();
     setToasts((t) => [...t, { id, title, msg, type }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5200);
   }, []);

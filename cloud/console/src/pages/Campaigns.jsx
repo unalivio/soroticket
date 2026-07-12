@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { api, fmtDate, idemKey, trunc } from "../api.js";
+import { api, decimalToBaseUnits, fmtDate, idemKey, trunc } from "../api.js";
 import { useApp } from "../store.jsx";
 import { BtnPrimary, ErrText, Ic, Pill } from "../ui.jsx";
 
 /* ── the five faces of the primitive ─────────────────────────────── */
 export const FACES = [
-  { kind: "coupon", name: "General coupon", desc: "One shared code, redeemed by many — every use counted on-chain.", example: "10OFF", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>) },
-  { kind: "creator", name: "Creator / referral code", desc: "A shared code attributed to a creator — each conversion credits them on-chain and can settle automatically.", example: "PEDROPROMO10", icon: Ic.users },
+  { kind: "coupon", name: "General coupon", desc: "One shared code, redeemed by many — signed events are anchored by period.", example: "10OFF", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>) },
+  { kind: "creator", name: "Creator / referral code", desc: "A shared code with an exact attributed period count and optional token payout.", example: "PEDROPROMO10", icon: Ic.users },
   { kind: "voucher", name: "Unique vouchers", desc: "Issued in batches; each code works exactly once, then it's gone.", example: "A7K9-QX2M", icon: Ic.coupon },
-  { kind: "ticket", name: "Event tickets", desc: "Unique codes burned at the door — unforgeable admission, real-time.", example: "TICKET-0042", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><rect x="4" y="4" width="6" height="6" rx="1.2" /><rect x="14" y="4" width="6" height="6" rx="1.2" /><rect x="4" y="14" width="6" height="6" rx="1.2" /><path d="M14 14h2.6v2.6H14zM17.4 17.4H20V20h-2.6z" /></svg>) },
-  { kind: "loyalty", name: "Loyalty program", desc: "Punches per purchase, anchored on-chain — hitting the threshold auto-issues a reward voucher.", example: "10 → 1 free", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><rect x="3.5" y="6" width="17" height="12" rx="2.5" /><circle cx="8" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="16" cy="12" r="1" strokeDasharray="1.5 1.5" /></svg>) },
+  { kind: "ticket", name: "Event tickets", desc: "Unique codes burned at the door — real-time single-use check-in.", example: "TICKET-0042", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><rect x="4" y="4" width="6" height="6" rx="1.2" /><rect x="14" y="4" width="6" height="6" rx="1.2" /><rect x="4" y="14" width="6" height="6" rx="1.2" /><path d="M14 14h2.6v2.6H14zM17.4 17.4H20V20h-2.6z" /></svg>) },
+  { kind: "loyalty", name: "Loyalty program", desc: "Signed punches can be anchored by period; thresholds auto-issue a reward voucher.", example: "10 → 1 free", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><rect x="3.5" y="6" width="17" height="12" rx="2.5" /><circle cx="8" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="16" cy="12" r="1" strokeDasharray="1.5 1.5" /></svg>) },
 ];
 
 export const kindTag = (c) => {
@@ -88,7 +88,7 @@ export function CampaignsPage() {
                         <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-2)" }}>{c.burned} / {c.total_supply} {c.kind === "ticket" ? "burned at the door" : "redeemed"}</span>
                       </div>
                     : <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        <span className="mono" style={{ fontSize: 13 }}>{(c.events_30d || 0).toLocaleString()} <span style={{ color: "var(--ink-3)", fontSize: 11.5 }}>counted</span></span>
+                        <span className="mono" style={{ fontSize: 13 }}>{(c.events_total || 0).toLocaleString()} <span style={{ color: "var(--ink-3)", fontSize: 11.5 }}>counted</span></span>
                         <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>one code · many uses</span>
                       </div>}
                   <span style={{ fontSize: 13, color: "var(--ink-2)" }}>{fmtDate(c.created_at)}</span>
@@ -114,7 +114,8 @@ export function Wizard({ onDone, fixedKind }) {
   const [f, setF] = useState({
     name: "", code: "", attributed_to: "", rate: "0.25",
     discount_type: "percentage", discount_value: "10",
-    total_supply: "100", months: "12", threshold: "10", reward: "1 free item",
+    total_supply: "100", months: "12", threshold: "10",
+    reward_type: "free_item", reward_value: "1",
   });
   const face = FACES.find((x) => x.kind === kind);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -127,13 +128,23 @@ export function Wizard({ onDone, fixedKind }) {
     try {
       let created;
       if (kind === "loyalty") {
-        const r = await api.post("/v1/loyalty/programs", {
-          name: f.name || "Loyalty program", threshold: Number(f.threshold) || 10,
-          reward_discount_type: "free_item", reward_discount_value: 1,
-        });
-        toast("Program created", `${f.name} · earn anchor ${r.program.earn_code} registered on-chain.`);
+        const threshold = Number(f.threshold);
+        const rewardValue = Number(f.reward_value);
+        if (!Number.isSafeInteger(threshold) || threshold < 1 || threshold > 1_000_000) {
+          throw new RangeError("Punch threshold must be an integer between 1 and 1,000,000.");
+        }
+        if (!Number.isSafeInteger(rewardValue) || rewardValue < 0) {
+          throw new RangeError("Reward value must be a non-negative safe integer.");
+        }
+        const programName = f.name.trim() || "Loyalty program";
+        const r = await api.postIdem("/v1/loyalty/programs", {
+          name: programName, threshold,
+          reward_discount_type: f.reward_type, reward_discount_value: rewardValue,
+        }, idemKey());
+        toast("Program created", `${programName} · earn anchor ${r.program.earn_code} registered on-chain.`);
         onDone(null); nav("/loyalty"); return;
       }
+      const payoutRate = kind === "creator" && f.rate ? decimalToBaseUnits(f.rate, 7) : "0";
       created = await api.postIdem("/v1/campaigns", {
         kind, name: f.name || (isShared ? f.code : "Campaign"),
         discount_type: f.discount_type, discount_value: Number(f.discount_value) || 0,
@@ -141,10 +152,10 @@ export function Wizard({ onDone, fixedKind }) {
         valid_until: Math.floor(Date.now() / 1000) + (Number(f.months) || 12) * 30 * 86400,
         shared: isShared ? {
           code: f.code, attributed_to: kind === "creator" ? f.attributed_to.trim() : "",
-          payout_rate: kind === "creator" && f.rate ? String(Math.round(parseFloat(f.rate) * 1e7)) : "0",
+          payout_rate: payoutRate,
         } : undefined,
       }, idemKey());
-      toast("Campaign created", `${created.name} is live on-chain${isShared ? ` · ${created.shared_code} registered` : ""}.`);
+      toast("Campaign created", `${created.name} was created on the legacy testnet contract${isShared ? ` · ${created.shared_code} registered` : ""}.`);
       onDone(created);
     } catch (e) { setErr(e); setBusy(false); }
   };
@@ -233,22 +244,23 @@ export function Wizard({ onDone, fixedKind }) {
                   <div className="field">
                     <label>The code <span className="req">*</span></label>
                     <input className="input mono" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} placeholder={face.example} />
-                    <span className="help">3–64 characters, unique in this campaign. This is what customers type at checkout.</span>
+                    <span className="help">1–64 UTF-8 bytes, unique in this campaign. This is what customers type at checkout.</span>
                   </div>
                   {kind === "creator" && <>
                     <div className="field">
                       <label>Creator's Stellar address <span className="req">*</span></label>
                       <input className="input mono" value={f.attributed_to} onChange={set("attributed_to")} placeholder="G…" />
-                      <span className="help">Attribution is bound to this address — the creator can verify their numbers without trusting your dashboard.</span>
+                      <span className="help">Attribution is bound to this address. The creator can verify published receipts and committed totals outside this dashboard; the receipt signer still attests that each event occurred.</span>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                       <div className="field">
                         <label>Payout token</label>
-                        <select className="select mono" style={{ fontSize: 13.5 }}><option>XLM (testnet) — USDC on mainnet</option></select>
+                        <select className="select mono" style={{ fontSize: 13.5 }}><option>XLM · legacy testnet preview</option></select>
                       </div>
                       <div className="field">
                         <label>Rate per redemption</label>
                         <input className="input mono" value={f.rate} onChange={set("rate")} />
+                        <span className="help">XLM amount · up to 7 decimal places in this testnet preview.</span>
                       </div>
                     </div>
                     <div style={{ background: "var(--pending-bg)", border: "1px solid color-mix(in oklch, var(--pending) 26%, transparent)", borderRadius: 12, padding: "13px 15px", display: "flex", gap: 11 }}>
@@ -258,15 +270,24 @@ export function Wizard({ onDone, fixedKind }) {
                   </>}
                 </>}
                 {kind === "loyalty"
-                  ? <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  ? <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
                       <div className="field">
                         <label>Punches to reward</label>
                         <input className="input mono" value={f.threshold} onChange={set("threshold")} />
                         <span className="help">e.g. 10 → the 10th punch auto-issues the voucher.</span>
                       </div>
                       <div className="field">
-                        <label>Reward</label>
-                        <input className="input" value={f.reward} onChange={set("reward")} />
+                        <label>Reward type</label>
+                        <select className="select mono" value={f.reward_type} onChange={set("reward_type")}>
+                          <option value="free_item">free_item</option>
+                          <option value="percentage">percentage</option>
+                          <option value="fixed_amount">fixed_amount</option>
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Reward value</label>
+                        <input className="input mono" value={f.reward_value} onChange={set("reward_value")} />
+                        <span className="help">Opaque integer interpreted by your POS.</span>
                       </div>
                     </div>
                   : <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -322,7 +343,7 @@ export function Wizard({ onDone, fixedKind }) {
                   <span>Due today</span><span className="mono">{env === "test" ? "free (test)" : `${cost} cr`}</span>
                 </div>
               </div>
-              <p className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.6, margin: 0, padding: "0 4px" }}>Introductory pricing — the monthly free grant covers a typical pilot. Test mode is always free.</p>
+              <p className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)", lineHeight: 1.6, margin: 0, padding: "0 4px" }}>Preview credits only — no payment processor is enabled. Test mode is always unmetered.</p>
             </div>
           </div>
         )}
@@ -338,7 +359,7 @@ export function Wizard({ onDone, fixedKind }) {
                 </div>
                 <div>
                   <div className="mono" style={{ fontSize: 32, fontWeight: 600, letterSpacing: ".01em" }}>{isShared ? (f.code || "—") : (f.name || "—")}</div>
-                  <div style={{ fontSize: 13.5, color: "var(--ink-2)", marginTop: 2 }}>{isShared ? f.name : kind === "loyalty" ? `${f.threshold} punches → ${f.reward}` : `${f.discount_value}${f.discount_type === "percentage" ? "%" : ""} · supply ${f.total_supply}`}</div>
+                  <div style={{ fontSize: 13.5, color: "var(--ink-2)", marginTop: 2 }}>{isShared ? f.name : kind === "loyalty" ? `${f.threshold} punches → ${f.reward_type} ${f.reward_value}` : `${f.discount_value}${f.discount_type === "percentage" ? "%" : ""} · supply ${f.total_supply}`}</div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px", fontSize: 13 }}>
                   {kind === "creator" && <>
@@ -360,7 +381,7 @@ export function Wizard({ onDone, fixedKind }) {
                 {(isShared || kind === "loyalty") && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--ink-2)" }}>
                     <span className="mono" style={{ width: 20, height: 20, flex: "none", borderRadius: 999, background: "var(--surface-inset)", border: "1px solid var(--line)", display: "grid", placeItems: "center", fontSize: 10.5 }}>2</span>
-                    <span style={{ flex: 1 }}>{kind === "loyalty" ? "The earn anchor is registered — punches will anchor per period" : <><span className="mono" style={{ fontSize: 12 }}>{f.code}</span> is registered{kind === "creator" ? " with its payout terms — locked" : ""}</>}</span>
+                    <span style={{ flex: 1 }}>{kind === "loyalty" ? "The earn code is registered — signed punches can be committed manually by period" : <><span className="mono" style={{ fontSize: 12 }}>{f.code}</span> is registered{kind === "creator" ? " with its payout terms — locked" : ""}</>}</span>
                     <span className="mono" style={{ fontSize: 12 }}>{env === "test" ? "free" : "10 cr"}</span>
                   </div>
                 )}
@@ -379,7 +400,7 @@ export function Wizard({ onDone, fixedKind }) {
               <button className="btn-plain" onClick={() => setStep(2)}>← Back</button>
               <BtnPrimary busy={busy} icon={<Ic.check width={15} height={15} />} onClick={create}>Create campaign</BtnPrimary>
             </div>
-            <p className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)", margin: 0, textAlign: "center" }}>You can archive a campaign anytime — archiving stops its monthly keep-alive charge.</p>
+            <p className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)", margin: 0, textAlign: "center" }}>You can archive a campaign anytime. Automated TTL keep-alive is not enabled yet.</p>
           </div>
         )}
       </div>

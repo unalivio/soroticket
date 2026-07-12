@@ -82,10 +82,10 @@ export function RedemptionsPage() {
                         <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14, boxShadow: "inset 0 0 0 1px color-mix(in oklch, var(--valid) 18%, transparent)" }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <span className="eyebrow" style={{ fontSize: 11, color: "var(--valid)" }}>✓ Redemption receipt</span>
-                            <button className="btn-plain" style={{ fontSize: 12, padding: "6px 13px" }} onClick={(e) => {
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><TxLink hash={r.tx_hash} /><button className="btn-plain" style={{ fontSize: 12, padding: "6px 13px" }} onClick={(e) => {
                               e.stopPropagation();
                               navigator.clipboard?.writeText(JSON.stringify(r, null, 2));
-                            }}>Copy receipt JSON</button>
+                            }}>Copy receipt JSON</button></div>
                           </div>
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px 20px", fontSize: 13 }}>
                             {[["token_id", r.token_id], ["code", r.code], ["burned_at", fmtDateTime(r.created_at)], ["ledger_seq", r.ledger_seq.toLocaleString()]].map(([k, v]) => (

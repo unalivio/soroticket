@@ -42,12 +42,12 @@ export function LoyaltyPage() {
                 ? <span key={i} style={{ width: 22, height: 22, borderRadius: 99, background: "var(--accent)", border: "1px solid var(--accent-2)", display: "grid", placeItems: "center", color: "var(--on-accent)", fontSize: 11, fontWeight: 700 }}>✓</span>
                 : <span key={i} style={{ width: 22, height: 22, borderRadius: 99, border: "1.5px dashed var(--line-2)" }} />)}
             </div>
-            <div className="mono" style={{ fontSize: 10.5, color: "var(--ink-3)", borderTop: "1px dashed var(--line-2)", paddingTop: 9 }}>anchored on-chain · weekly</div>
+            <div className="mono" style={{ fontSize: 10.5, color: "var(--ink-3)", borderTop: "1px dashed var(--line-2)", paddingTop: 9 }}>signed receipts · manual period anchor</div>
           </div>
           <div>
-            <h2 className="display" style={{ fontSize: 26, margin: 0 }}>Buy 10, get 1 free — on-chain.</h2>
+            <h2 className="display" style={{ fontSize: 26, margin: 0 }}>Buy 10, get 1 free — with signed punches.</h2>
             <p style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.55, margin: "8px 0 0" }}>
-              Punch cards your customers can't lose and you can't fudge. Totals anchor on-chain weekly; the reward voucher issues itself.
+              Punches produce signed receipts. You can commit a period total on-chain manually; crossing the threshold issues the reward voucher.
             </p>
           </div>
           <BtnPrimary icon={<Ic.plus width={15} height={15} />} onClick={() => setCreate(true)}>Create a program</BtnPrimary>
@@ -62,7 +62,7 @@ export function LoyaltyPage() {
       <div className="page-head">
         <div>
           <h1 className="display" style={{ fontSize: 27, margin: 0 }}>Loyalty</h1>
-          <p className="page-sub">Punch programs · earn side anchored per period, rewards issue automatically</p>
+          <p className="page-sub">Punch programs · signed earn receipts, manual period commits, automatic reward issuance</p>
         </div>
         <BtnPrimary small icon={<Ic.plus width={13} height={13} />} onClick={() => setCreate(true)}>New program</BtnPrimary>
       </div>
@@ -132,7 +132,7 @@ export function LoyaltyDetailPage({ id }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--accent)" }} /><span style={{ fontSize: 13, color: "var(--ink-2)" }}><strong style={{ color: "var(--ink)" }}>{p.rewards_redeemed}</strong> redeemed</span></div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "var(--line)" }} /><span style={{ fontSize: 13, color: "var(--ink-2)" }}><strong style={{ color: "var(--ink)" }}>{outstanding}</strong> outstanding</span></div>
             <div className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)", borderTop: "1px dashed var(--line-2)", paddingTop: 10 }}>
-              {p.punches} punches total<br />{p.pending_anchor_events > 0 ? `${p.pending_anchor_events} pending anchor` : "all anchored"}
+              {p.punches} punches total<br />{p.pending_anchor_events > 0 ? `${p.pending_anchor_events} pending anchor` : "no pending receipts"}
             </div>
           </div>
         </div>
@@ -151,7 +151,7 @@ export function LoyaltyDetailPage({ id }) {
           </div>
           <p style={{ fontSize: 12.5, color: "var(--ink-2)", margin: 0, lineHeight: 1.5 }}>
             Crossing the threshold auto-issues a single-use voucher on the reward campaign and fires{" "}
-            <span className="mono" style={{ fontSize: 11.5 }}>loyalty.reward_issued</span>. Period totals anchor on-chain;
+            <span className="mono" style={{ fontSize: 11.5 }}>loyalty.reward_issued</span>. Period totals can be committed on-chain manually;
             per-customer balances stay private.
           </p>
         </div>
@@ -216,6 +216,7 @@ export function LoyaltyDetailPage({ id }) {
 function PunchModal({ p, onClose }) {
   const { toast } = useApp();
   const [ref, setRef] = useState("");
+  const [eventRef, setEventRef] = useState("");
   const [count, setCount] = useState("1");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -223,7 +224,11 @@ function PunchModal({ p, onClose }) {
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
-      const r = await api.postIdem(`/v1/loyalty/programs/${p.id}/punches`, { customer_ref: ref, count: Number(count) || 1 }, idemKey());
+      const parsedCount = Number(count);
+      if (!Number.isSafeInteger(parsedCount) || parsedCount < 1 || parsedCount > 1_000) {
+        throw new RangeError("Punches must be an integer between 1 and 1,000.");
+      }
+      const r = await api.postIdem(`/v1/loyalty/programs/${p.id}/punches`, { customer_ref: ref, event_ref: eventRef, count: parsedCount }, idemKey());
       if (r.rewards_issued.length > 0) {
         toast("Reward issued! 🎟", `Voucher ${r.rewards_issued.join(", ")} auto-issued on-chain — ${r.punches} punches total.`);
       } else {
@@ -244,6 +249,11 @@ function PunchModal({ p, onClose }) {
           <label>Customer <span className="req">*</span></label>
           <input className="input" value={ref} onChange={(e) => setRef(e.target.value)} placeholder="phone, email or POS id" autoFocus />
           <span className="help">Hashed before storage — the chain never sees who they are.</span>
+        </div>
+        <div className="field">
+          <label>Sale / event ID <span style={{ color: "var(--ink-3)" }}>optional</span></label>
+          <input className="input mono" value={eventRef} onChange={(e) => setEventRef(e.target.value)} placeholder="POS-ORDER-1042" />
+          <span className="help">Use a stable POS reference to reject the same event even if it arrives with a different idempotency key.</span>
         </div>
         <div className="field">
           <label>Punches</label>
