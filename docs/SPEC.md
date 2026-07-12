@@ -1,9 +1,10 @@
-# Sorodeal Protocol Spec (draft, candidate v0.2)
+# Sorodeal Protocol Spec (v0.2)
 
-> Candidate v0.2 implements Burn and Tally locally but is **not deployed**. The
-> existing testnet v0.1 contract is deprecated; its ID is not evidence that this
-> version is live. The frozen candidate ABI is
-> `contracts/coupon-ledger/abi-v0.2.0.txt`.
+> v0.2.0 implements Burn and Tally and is deployed to **testnet** at
+> `CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF`
+> (2026-07-12; see `deployments/testnet-v0.2.0.json`). Testnet preview only —
+> never point real value at it. The v0.1 testnet contract is deprecated. The
+> frozen ABI is `contracts/coupon-ledger/abi-v0.2.0.txt`.
 
 ## 1. Scope and trust model
 
@@ -69,7 +70,7 @@ Payout { to: Address, amount: i128 }
 `discount_type` and `discount_value` are opaque reward metadata interpreted by
 the integrator. There is no on-chain percentage/currency semantics.
 
-## 3. Candidate v0.2 interface
+## 3. v0.2 interface
 
 ### Campaigns and Burn
 
@@ -216,7 +217,7 @@ integrations must inventory campaign IDs, codes, delegates and tally periods,
 call the appropriate `bump_*` methods before archival and budget network rent.
 The contract cannot iterate all codes/delegates for an owner.
 
-## 9. Deliberately outside candidate v0.2
+## 9. Deliberately outside v0.2
 
 The following are product ideas, not implemented contract guarantees:
 

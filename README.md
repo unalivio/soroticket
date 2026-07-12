@@ -23,9 +23,9 @@ implemented from policy extensions that still require design and code:
 
 | Use case | Code → redemptions | Profile | Status |
 |---|---|---|---|
-| Delivery promo (`SUPERBOWL10`) | 1 → many | Tally | Candidate v0.2 + Cloud preview |
-| Creator / UGC code (`ROBERTOX`) | 1 → many, fixed attribution | Tally + payout | Candidate v0.2 + Cloud preview |
-| Event ticket / unique voucher | many × (1 → 1) | Burn | Candidate v0.2 + Cloud preview |
+| Delivery promo (`SUPERBOWL10`) | 1 → many | Tally | v0.2 testnet + Cloud preview |
+| Creator / UGC code (`ROBERTOX`) | 1 → many, fixed attribution | Tally + payout | v0.2 testnet + Cloud preview |
+| Event ticket / unique voucher | many × (1 → 1) | Burn | v0.2 testnet + Cloud preview |
 | Loyalty threshold → reward | shared punches + unique rewards | Tally + Burn | Cloud preview; customer ledger is off-chain |
 | Referral with once-per-user rules | 1 per user → many | Tally + payout | Planned; anti-fraud/reversals absent |
 | Geo-drop / proof-of-presence | unique or capped | Burn + geofence | Planned; geofence absent |
@@ -35,7 +35,7 @@ Spec nouns: **Campaign → Code → Redemption → Settlement.**
 ## Two redemption profiles
 
 - **Burn (synchronous):** unique single-use tokens. One on-chain tx per redemption. Best for tickets and high-value vouchers — real-time double-use prevention "at the door." *(Implemented.)*
-- **Tally (asynchronous):** shared multi-use codes. Hot path off-chain; periodic on-chain commitment of signed receipt hashes and exact attributed counts. Cheap at scale and tamper-evident after commitment. *(Implemented in candidate v0.2; Cloud publishes receipt proofs.)*
+- **Tally (asynchronous):** shared multi-use codes. Hot path off-chain; periodic on-chain commitment of signed receipt hashes and exact attributed counts. Cheap at scale and tamper-evident after commitment. *(Implemented in v0.2 on testnet; Cloud publishes receipt proofs.)*
 
 ## Repo layout
 

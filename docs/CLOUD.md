@@ -4,10 +4,10 @@ Sorodeal Cloud is the hosted convenience layer over the open contract: a Go
 REST API, SQLite index and React console for teams that do not want to operate a
 wallet or SDK directly.
 
-> Status (2026-07-11): working **testnet preview**, not production. TEST is free
-> and METERED exercises the credit ledger, but both use the deprecated v0.1
-> testnet contract. Mainnet, production billing, automatic TTL maintenance and
-> automatic tally scheduling are disabled.
+> Status (2026-07-12): working **testnet preview**, not production. TEST is free
+> and METERED exercises the credit ledger; both use the v0.2.0 testnet contract
+> (`deployments/testnet-v0.2.0.json`). Mainnet, production billing, automatic
+> TTL maintenance and automatic tally scheduling are disabled.
 
 ## 1. Implemented architecture
 
@@ -18,7 +18,7 @@ Console / integrator
 Cloud API (Go) ---- SQLite/WAL index, receipts, credits, idempotency
         |
         v
-Stellar testnet ---- legacy contract v0.1
+Stellar testnet ---- contract v0.2.0
 ```
 
 - One encrypted custodial Stellar seed per organization and environment.
@@ -41,6 +41,13 @@ moved to the new HMAC identity, but the unsigned historical event remains
 quarantined. Pre-upgrade idempotency fingerprints also fail closed with `409`
 instead of being replayed under the new keyed format. Operators should
 export/reconcile these rows explicitly.
+
+Migration v2 stamps every campaign with the contract deployment it was created
+on. Rows that predate the stamp were created against the deprecated v0.1
+contract; they stay readable, but any chain operation on them (issue, redeem,
+verify, shared events, commits, settlements, loyalty punches) returns `409` —
+v0.2 restarts campaign numbering, so a legacy `chain_id` resolved on the
+current contract would address a different campaign.
 
 ## 2. Authentication and request rules
 
@@ -102,11 +109,12 @@ while allowing retrospective tally commits and settlements. Expiry also blocks
 new shared events/punches. Archive does not modify or preserve existing Soroban
 state.
 
-Cloud pins the legacy contract ID explicitly. Its current settlement is signed
-by the custodial campaign owner and uses v0.1's direct token transfer; Cloud
-does not create an unused token allowance. A future v0.2 migration must be
-explicitly capability-gated and approve only the exact period amount before
-calling the allowance-based settlement.
+Cloud pins the v0.2.0 contract ID explicitly and never inherits an SDK default.
+Settlement follows the v0.2 capability gate: Cloud previews the period's
+payouts, approves **exactly** that total on the payout token immediately before
+calling the allowance-based `settle`, and leaves no standing spend authority
+behind. If settlement fails after the approval, the exact-amount allowance
+expires on its own (~1 hour of ledgers).
 
 ## 4. Credits and metering
 
@@ -209,7 +217,7 @@ Consumers must reject stale timestamps and deduplicate delivery IDs.
 
 ## 8. Explicitly not implemented / production blockers
 
-- Mainnet and a reviewed v0.2 deployed contract.
+- Mainnet.
 - Stripe checkout or a verified USDC deposit watcher.
 - KMS/HSM custody, key export, rotation workflow and recovery.
 - MFA/passkeys, email verification and password reset.

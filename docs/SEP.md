@@ -234,7 +234,7 @@ hybrid on/off-chain + PII-as-commitment (ADR-005/010), delegate granularity
 (ADR-007), on-chain owner index (ADR-008), per-campaign code scope + term
 validation + TTL ops (ADR-009), Tally + settlement (ADR-011), settlement
 hardening — binding attribution & immutable config (ADR-012), and Tally
-edge invariants (ADR-013), and candidate v0.2 hardening (ADR-014/015).
+edge invariants (ADR-013), and v0.2 hardening (ADR-014/015).
 
 ## Security Concerns
 
@@ -251,13 +251,17 @@ edge invariants (ADR-013), and candidate v0.2 hardening (ADR-014/015).
 
 ## Reference Implementation
 
-`contracts/coupon-ledger/` (Rust + Soroban SDK) contains candidate v0.2. The
-immutable v0.1 contract at
+`contracts/coupon-ledger/` (Rust + Soroban SDK) contains v0.2.0, deployed to
+testnet on 2026-07-12 at
+`CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF`
+(see `deployments/testnet-v0.2.0.json`). The immutable v0.1 contract at
 `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX` is deprecated and
-must not be represented as this candidate. Builds use a pinned toolchain.
+must not be represented as v0.2. Builds use a pinned toolchain.
 
 ## Changelog
 
 - 0.1.0 (2026-05-31): initial draft from the reference implementation.
 - 0.2.0-draft (2026-07-11): exact attribution, allowance-based settlement,
   CEI, settlement reads, bounded ownership pagination and TTL additions.
+- 0.2.0 (2026-07-12): testnet deployment
+  `CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF`.

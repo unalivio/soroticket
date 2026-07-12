@@ -1,22 +1,28 @@
 # Sorodeal — roadmap and release gates
 
-Status snapshot: 2026-07-11. This file distinguishes working code from design
+Status snapshot: 2026-07-12. This file distinguishes working code from design
 targets so the console and documentation do not imply mock features are live.
 
 ## Current artifacts
 
+- **v0.2.0 testnet:** deployed 2026-07-12 at
+  `CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF`
+  (`deployments/testnet-v0.2.0.json`): Burn + Tally, exact attribution,
+  allowance-based permissionless settlement, checks-effects-interactions,
+  public settlement state, paged campaign ownership and TTL helpers. Testnet
+  preview — never real value.
 - **Legacy v0.1 testnet:** deployed at
-  `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX`; deprecated and
-  unsafe for new or real-value integrations. It accepts partial attributed
-  tallies and requires an owner signature for each settlement.
-- **Candidate v0.2:** Burn + Tally, exact attribution, allowance-based
-  permissionless settlement, checks-effects-interactions, public settlement
-  state, paged campaign ownership and TTL helpers. Built/tested locally; **not
-  deployed**. See `deployments/candidate-v0.2.0.json`.
-- **SDKs/playground:** updated for the v0.2 ABI, but their compatibility default
-  still names legacy v0.1 until an approved v0.2 deployment exists.
-- **Cloud:** real Go API and React console, but TEST and METERED are both
-  testnet previews over legacy v0.1. Mainnet and real billing are disabled.
+  `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX`; deprecated,
+  superseded by v0.2.0 and unsafe for new or real-value integrations. It
+  accepts partial attributed tallies and requires an owner signature for each
+  settlement.
+- **SDKs/playground:** default to the v0.2.0 deployment; the legacy
+  compatibility alias is retired (`LEGACY_TESTNET`/`LegacyTestnetContractID`
+  remain only as explicitly named v0.1 constants).
+- **Cloud:** real Go API and React console; TEST and METERED are testnet
+  previews over v0.2.0. Campaign rows are stamped with their contract
+  deployment; rows created on v0.1 fail closed (409) for chain operations.
+  Mainnet and real billing are disabled.
 
 ## Completed in this security pass
 
@@ -37,16 +43,21 @@ targets so the console and documentation do not imply mock features are live.
 - [x] Recharge endpoint fails with `501 Not Implemented` instead of returning a
   pretend payment destination.
 
-## Required before a v0.2 testnet release
+## v0.2 testnet release gates (completed 2026-07-12)
 
-- [ ] Review the security report and authorize deployment explicitly.
-- [ ] Deploy the candidate WASM, record the real contract ID/hash and seed only
-  valid examples.
-- [ ] Point SDK, playground and Cloud defaults to that deployment; retire the
-  legacy compatibility alias.
-- [ ] Re-run live E2E tests against the v0.2 contract, including token allowance
-  approval and a third-party keeper settlement.
-- [ ] Publish a signed receipt verifier package/CLI, not only the Cloud endpoint.
+- [x] Security report reviewed; deployment explicitly authorized by the
+  operator (2026-07-12).
+- [x] WASM deployed with the reproducible hash; the real contract ID and
+  transaction hashes are recorded in `deployments/testnet-v0.2.0.json`. No
+  fabricated seed data — on-chain state comes from live E2E and Cloud fixtures.
+- [x] SDK, playground and Cloud defaults point to the v0.2.0 deployment; the
+  legacy compatibility alias is retired.
+- [x] Live E2E re-run against v0.2: Go 53/53 and TypeScript 53/53 scenarios,
+  including exact-attribution commits, settle-without-allowance rejection
+  (#18), the owner's exact allowance approval and a third-party keeper
+  settlement that consumes the allowance to zero.
+- [ ] Publish a signed receipt verifier package/CLI, not only the Cloud
+  endpoint.
 
 ## Production blockers
 
