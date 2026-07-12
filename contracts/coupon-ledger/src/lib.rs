@@ -22,15 +22,15 @@
 //! off-chain (random nonce or merchant HMAC). No plaintext PII is stored.
 //!
 //! The async **Tally** profile (shared codes, Merkle-anchored counts +
-//! attribution + USDC settlement; ADR-003/004/011) is also implemented:
+//! attribution + optional SAC token settlement; ADR-003/004/011) is also implemented:
 //! `register_shared` → `commit_tally` (count + merkle_root + per-attribution
 //! counts) → `get_tally`/`compute_payouts` → `settle` (token payout to the
 //! attributed addresses). Shared codes live in a namespace separate from the
 //! Burn unique codes, so a campaign may use either profile.
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, log, symbol_short, Address, BytesN, Env,
-    Map, String, Symbol, Vec,
+    contract, contracterror, contractevent, contractimpl, contracttype, log, symbol_short, Address,
+    BytesN, Env, Map, String, Symbol, Vec,
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -125,9 +125,10 @@ pub struct SharedCode {
 }
 
 /// A per-epoch on-chain commitment of off-chain redemptions for a shared code:
-/// a total `count`, a `merkle_root` anchoring the underlying signed receipts (so
-/// anyone can audit a claimed count), and `per_attribution` counts used for
-/// settlement. This is what makes attribution trustless (ADR-004).
+/// a total `count`, a `merkle_root` anchoring the underlying signed receipts,
+/// and `per_attribution` counts used for settlement. Anyone with the receipts
+/// can detect changes against the root; the receipt signer remains the trust
+/// anchor for whether an off-chain redemption was genuine (ADR-004/014).
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct TallyCommitment {
@@ -143,6 +144,61 @@ pub struct TallyCommitment {
 pub struct Payout {
     pub to: Address,
     pub amount: i128,
+}
+
+// Typed events keep the v0 topic/data layout while exporting an event schema
+// for indexers and current SDK bindings.
+#[contractevent(topics = ["campaign", "create"], data_format = "vec")]
+pub struct CampaignCreated {
+    pub id: u64,
+    pub owner: Address,
+    pub name: String,
+    pub total_supply: u32,
+}
+
+#[contractevent(topics = ["coupon", "issue"], data_format = "vec")]
+pub struct CouponIssued {
+    pub token_id: u64,
+    pub campaign_id: u64,
+}
+
+#[contractevent(topics = ["coupon", "burn"], data_format = "vec")]
+pub struct CouponBurned {
+    pub token_id: u64,
+    pub ledger_seq: u32,
+}
+
+#[contractevent(topics = ["delegate", "add"], data_format = "vec")]
+pub struct DelegateAdded {
+    pub campaign_id: u64,
+    pub delegate: Address,
+}
+
+#[contractevent(topics = ["delegate", "remove"], data_format = "vec")]
+pub struct DelegateRemoved {
+    pub campaign_id: u64,
+    pub delegate: Address,
+}
+
+#[contractevent(topics = ["shared", "reg"], data_format = "vec")]
+pub struct SharedRegistered {
+    pub campaign_id: u64,
+    pub attributed_to: Option<Address>,
+}
+
+#[contractevent(topics = ["tally", "commit"], data_format = "vec")]
+pub struct TallyCommitted {
+    pub campaign_id: u64,
+    pub period: u64,
+    pub count: u32,
+}
+
+#[contractevent(topics = ["tally", "settle"], data_format = "vec")]
+pub struct TallySettled {
+    pub campaign_id: u64,
+    pub period: u64,
+    pub token: Address,
+    pub payout_rate: i128,
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -169,7 +225,7 @@ pub enum Error {
     PeriodCommitted = 14, // a tally for this (code, period) was already committed
     TallyNotFound = 15, // no tally committed for this (code, period)
     AlreadySettled = 16, // this tally period was already settled
-    InvalidTally = 17, // per-attribution counts exceed the committed total
+    InvalidTally = 17, // an attributed count does not exactly equal the committed total
     InvalidSettlement = 18, // payout rate not > 0, settlement not configured, or amount overflow
     AttributionMismatch = 19, // tally credits an address other than the code's registered attributed_to
 }
@@ -185,14 +241,16 @@ const TOKEN_CTR: Symbol = symbol_short!("tok_ctr");
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
-    Campaign(u64),             // Campaign by ID
-    Token(u64),                // CouponToken by token ID
-    CodeIndex(u64, String),    // (campaign_id, code) → token ID — scoped per campaign (ADR-009)
-    Delegate(u64, Address),    // (campaign_id, delegate) present ⇒ authorized to redeem
-    OwnerIndex(Address),       // owner → Vec<u64> of the campaign IDs they created
-    Shared(u64, String),       // (campaign_id, code) → SharedCode (Tally)
-    Tally(u64, String, u64),   // (campaign_id, code, period) → TallyCommitment
-    Settled(u64, String, u64), // (campaign_id, code, period) present ⇒ already settled
+    Campaign(u64),               // Campaign by ID
+    Token(u64),                  // CouponToken by token ID
+    CodeIndex(u64, String),      // (campaign_id, code) → token ID — scoped per campaign (ADR-009)
+    Delegate(u64, Address),      // (campaign_id, delegate) present ⇒ authorized to redeem
+    OwnerCount(Address),         // owner → number of campaigns created
+    OwnerCampaign(Address, u64), // (owner, zero-based slot) → campaign ID
+    CampaignOwnerSlot(u64),      // campaign ID → owner's zero-based slot (TTL maintenance)
+    Shared(u64, String),         // (campaign_id, code) → SharedCode (Tally)
+    Tally(u64, String, u64),     // (campaign_id, code, period) → TallyCommitment
+    Settled(u64, String, u64),   // (campaign_id, code, period) present ⇒ already settled
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -254,24 +312,33 @@ impl CouponLedger {
             .persistent()
             .extend_ttl(&key, LEDGER_BUMP, EXTEND_TO);
 
-        // Owner → [campaign_id] index so an owner can enumerate their campaigns
-        // on-chain (Soroban storage is not iterable). Chain is the source of truth.
-        let idx_key = DataKey::OwnerIndex(owner.clone());
-        let mut owned: Vec<u64> = env
-            .storage()
-            .persistent()
-            .get(&idx_key)
-            .unwrap_or_else(|| Vec::new(&env));
-        owned.push_back(id);
-        env.storage().persistent().set(&idx_key, &owned);
+        // O(1) paged owner index. Storing one ever-growing Vec would rewrite the
+        // full history on every create and eventually self-DoS prolific owners.
+        let count_key = DataKey::OwnerCount(owner.clone());
+        let owner_count: u64 = env.storage().persistent().get(&count_key).unwrap_or(0);
+        let next_count = owner_count.checked_add(1).ok_or(Error::InvalidTerms)?;
+        let entry_key = DataKey::OwnerCampaign(owner.clone(), owner_count);
+        let slot_key = DataKey::CampaignOwnerSlot(id);
+        env.storage().persistent().set(&entry_key, &id);
+        env.storage().persistent().set(&slot_key, &owner_count);
+        env.storage().persistent().set(&count_key, &next_count);
         env.storage()
             .persistent()
-            .extend_ttl(&idx_key, LEDGER_BUMP, EXTEND_TO);
+            .extend_ttl(&entry_key, LEDGER_BUMP, EXTEND_TO);
+        env.storage()
+            .persistent()
+            .extend_ttl(&slot_key, LEDGER_BUMP, EXTEND_TO);
+        env.storage()
+            .persistent()
+            .extend_ttl(&count_key, LEDGER_BUMP, EXTEND_TO);
 
-        env.events().publish(
-            (symbol_short!("campaign"), symbol_short!("create")),
-            (id, owner, name, total_supply),
-        );
+        CampaignCreated {
+            id,
+            owner,
+            name,
+            total_supply,
+        }
+        .publish(&env);
 
         log!(&env, "Campaign created: id={}, supply={}", id, total_supply);
         Ok(id)
@@ -285,12 +352,64 @@ impl CouponLedger {
             .ok_or(Error::CampaignNotFound)
     }
 
-    /// List the campaign IDs created by `owner`. Public, no auth (ADR-008).
+    /// List every campaign ID created by `owner`. Public compatibility helper;
+    /// integrations with potentially large accounts should use `campaigns_page`.
     pub fn campaigns_of(env: Env, owner: Address) -> Vec<u64> {
-        env.storage()
+        let count: u64 = env
+            .storage()
             .persistent()
-            .get(&DataKey::OwnerIndex(owner))
-            .unwrap_or_else(|| Vec::new(&env))
+            .get(&DataKey::OwnerCount(owner.clone()))
+            .unwrap_or(0);
+        let mut out = Vec::new(&env);
+        let mut slot = 0u64;
+        while slot < count {
+            if let Some(id) = env
+                .storage()
+                .persistent()
+                .get(&DataKey::OwnerCampaign(owner.clone(), slot))
+            {
+                out.push_back(id);
+            }
+            slot += 1;
+        }
+        out
+    }
+
+    /// Bounded owner-campaign pagination. `cursor` is a zero-based slot and
+    /// `limit` must be 1..=MAX_BATCH. Public, no auth.
+    pub fn campaigns_page(
+        env: Env,
+        owner: Address,
+        cursor: u64,
+        limit: u32,
+    ) -> Result<Vec<u64>, Error> {
+        if limit == 0 || limit > MAX_BATCH {
+            return Err(Error::BatchTooLarge);
+        }
+        let count: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::OwnerCount(owner.clone()))
+            .unwrap_or(0);
+        let requested_end = cursor.saturating_add(limit as u64);
+        let end = if requested_end < count {
+            requested_end
+        } else {
+            count
+        };
+        let mut out = Vec::new(&env);
+        let mut slot = cursor;
+        while slot < end {
+            if let Some(id) = env
+                .storage()
+                .persistent()
+                .get(&DataKey::OwnerCampaign(owner.clone(), slot))
+            {
+                out.push_back(id);
+            }
+            slot += 1;
+        }
+        Ok(out)
     }
 
     /// Get campaign statistics. Public, no auth.
@@ -310,9 +429,10 @@ impl CouponLedger {
         })
     }
 
-    /// Re-extend the storage TTL of a campaign (and its owner index). Public —
+    /// Re-extend the storage TTL of a campaign (and its owner-index entries). Public —
     /// anyone may pay to keep a long-running campaign's metadata alive past the
-    /// default window (ADR-009). Tokens are extended on access.
+    /// default window (ADR-009). Coupon and delegate entries must be supplied to
+    /// `bump_codes` / `bump_delegates` because persistent storage is not iterable.
     pub fn bump_campaign(env: Env, campaign_id: u64) -> Result<(), Error> {
         let camp: Campaign = env
             .storage()
@@ -325,11 +445,23 @@ impl CouponLedger {
             .persistent()
             .extend_ttl(&ckey, LEDGER_BUMP, EXTEND_TO);
 
-        let okey = DataKey::OwnerIndex(camp.owner);
-        if env.storage().persistent().has(&okey) {
+        let count_key = DataKey::OwnerCount(camp.owner.clone());
+        if env.storage().persistent().has(&count_key) {
             env.storage()
                 .persistent()
-                .extend_ttl(&okey, LEDGER_BUMP, EXTEND_TO);
+                .extend_ttl(&count_key, LEDGER_BUMP, EXTEND_TO);
+        }
+        let slot_key = DataKey::CampaignOwnerSlot(campaign_id);
+        if let Some(slot) = env.storage().persistent().get::<_, u64>(&slot_key) {
+            env.storage()
+                .persistent()
+                .extend_ttl(&slot_key, LEDGER_BUMP, EXTEND_TO);
+            let entry_key = DataKey::OwnerCampaign(camp.owner, slot);
+            if env.storage().persistent().has(&entry_key) {
+                env.storage()
+                    .persistent()
+                    .extend_ttl(&entry_key, LEDGER_BUMP, EXTEND_TO);
+            }
         }
         env.storage().instance().extend_ttl(LEDGER_BUMP, EXTEND_TO);
         Ok(())
@@ -372,6 +504,35 @@ impl CouponLedger {
         Ok(())
     }
 
+    /// Re-extend specific delegate authorizations for a long-running campaign.
+    /// Public — anyone may pay rent; unknown delegates are skipped. The caller
+    /// supplies addresses because Soroban persistent storage is not iterable.
+    pub fn bump_delegates(
+        env: Env,
+        campaign_id: u64,
+        delegates: Vec<Address>,
+    ) -> Result<(), Error> {
+        if delegates.len() > MAX_BATCH {
+            return Err(Error::BatchTooLarge);
+        }
+        if !env
+            .storage()
+            .persistent()
+            .has(&DataKey::Campaign(campaign_id))
+        {
+            return Err(Error::CampaignNotFound);
+        }
+        for delegate in delegates.iter() {
+            let key = DataKey::Delegate(campaign_id, delegate);
+            if env.storage().persistent().has(&key) {
+                env.storage()
+                    .persistent()
+                    .extend_ttl(&key, LEDGER_BUMP, EXTEND_TO);
+            }
+        }
+        Ok(())
+    }
+
     // ─── DELEGATES (ADR-002: "explicit delegates") ───────────────
 
     /// Authorize `delegate` to redeem coupons of `campaign_id`. Owner only.
@@ -390,10 +551,11 @@ impl CouponLedger {
             .persistent()
             .extend_ttl(&key, LEDGER_BUMP, EXTEND_TO);
 
-        env.events().publish(
-            (symbol_short!("delegate"), symbol_short!("add")),
-            (campaign_id, delegate),
-        );
+        DelegateAdded {
+            campaign_id,
+            delegate,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -410,10 +572,11 @@ impl CouponLedger {
         let key = DataKey::Delegate(campaign_id, delegate.clone());
         env.storage().persistent().remove(&key);
 
-        env.events().publish(
-            (symbol_short!("delegate"), symbol_short!("remove")),
-            (campaign_id, delegate),
-        );
+        DelegateRemoved {
+            campaign_id,
+            delegate,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -509,10 +672,11 @@ impl CouponLedger {
             token_ids.push_back(token_id);
 
             // Code is NOT published in events (prevents harvesting).
-            env.events().publish(
-                (symbol_short!("coupon"), symbol_short!("issue")),
-                (token_id, campaign_id),
-            );
+            CouponIssued {
+                token_id,
+                campaign_id,
+            }
+            .publish(&env);
         }
 
         camp.minted = new_minted;
@@ -609,10 +773,11 @@ impl CouponLedger {
             ledger_seq: seq,
         };
 
-        env.events().publish(
-            (symbol_short!("coupon"), symbol_short!("burn")),
-            (token_id, seq),
-        );
+        CouponBurned {
+            token_id,
+            ledger_seq: seq,
+        }
+        .publish(&env);
 
         log!(&env, "Coupon burned: token={}, ledger={}", token_id, seq);
         Ok(receipt)
@@ -738,10 +903,11 @@ impl CouponLedger {
             .persistent()
             .extend_ttl(&key, LEDGER_BUMP, EXTEND_TO);
 
-        env.events().publish(
-            (symbol_short!("shared"), symbol_short!("reg")),
-            (campaign_id, attributed_to),
-        );
+        SharedRegistered {
+            campaign_id,
+            attributed_to,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -756,7 +922,10 @@ impl CouponLedger {
     /// Commit an epoch's off-chain tally for a shared code: a total `count`, a
     /// `merkle_root` anchoring the signed receipts, and `per_attribution` counts.
     /// Owner only; one commitment per (code, period) — append-only so history is
-    /// auditable. Per-attribution counts must not exceed `count`. (ADR-003/004)
+    /// auditable. For an attributed code, every redemption belongs to its one
+    /// registered target, so the attributed count must equal `count`; allowing
+    /// a smaller number would let an owner commit conversions while
+    /// underpaying the creator. (ADR-003/004/014)
     pub fn commit_tally(
         env: Env,
         owner: Address,
@@ -793,7 +962,7 @@ impl CouponLedger {
             }
             attributed = attributed.checked_add(v).ok_or(Error::InvalidTally)?;
         }
-        if attributed > count {
+        if shared.attributed_to.is_some() && attributed != count {
             return Err(Error::InvalidTally);
         }
 
@@ -808,15 +977,17 @@ impl CouponLedger {
             .persistent()
             .extend_ttl(&key, LEDGER_BUMP, EXTEND_TO);
 
-        env.events().publish(
-            (symbol_short!("tally"), symbol_short!("commit")),
-            (campaign_id, period, count),
-        );
+        TallyCommitted {
+            campaign_id,
+            period,
+            count,
+        }
+        .publish(&env);
         Ok(())
     }
 
     /// Get a committed tally for a (shared code, period). Public, no auth —
-    /// anyone can audit the count against the merkle_root. (ADR-004)
+    /// anyone with the signed receipts can verify inclusion against merkle_root.
     pub fn get_tally(
         env: Env,
         campaign_id: u64,
@@ -829,9 +1000,16 @@ impl CouponLedger {
             .ok_or(Error::TallyNotFound)
     }
 
+    /// Whether a committed tally period has already been paid. Public, no auth.
+    /// This lets keepers, SDKs and auditors avoid attempting a duplicate payout.
+    pub fn is_settled(env: Env, campaign_id: u64, code: String, period: u64) -> bool {
+        env.storage()
+            .persistent()
+            .has(&DataKey::Settled(campaign_id, code, period))
+    }
+
     /// Preview the payouts a settlement would produce for a committed tally at
-    /// `rate` (token base-units per redemption). Public, read-only — no transfer,
-    /// no auth. (ADR-004)
+    /// the shared code's immutable rate. Public, read-only — no transfer or auth.
     pub fn compute_payouts(
         env: Env,
         campaign_id: u64,
@@ -859,9 +1037,10 @@ impl CouponLedger {
     }
 
     /// Settle a committed tally: pay each attributed address `count * rate` of
-    /// `token`, from the campaign `owner`'s balance (SDP-style automatic payout —
-    /// ADR-004). Owner only; a period settles once. `rate` is token base-units
-    /// per redemption. Returns the payouts made.
+    /// `token`, from the campaign `owner`'s balance (keeper-triggerable payout —
+    /// ADR-004/014). Permissionless execution: the owner pre-approves this
+    /// contract as a token spender, then any fee payer may trigger settlement.
+    /// A period settles once. Returns the payouts made.
     pub fn settle(
         env: Env,
         owner: Address,
@@ -869,7 +1048,6 @@ impl CouponLedger {
         code: String,
         period: u64,
     ) -> Result<Vec<Payout>, Error> {
-        owner.require_auth();
         Self::require_owner(&env, campaign_id, &owner)?;
 
         // Token + rate are fixed at registration (immutable) — settle can't use
@@ -899,26 +1077,45 @@ impl CouponLedger {
         }
 
         let client = soroban_sdk::token::Client::new(&env, &token);
+        let spender = env.current_contract_address();
         let mut out = Vec::new(&env);
+        let mut total: i128 = 0;
         for (addr, n) in tally.per_attribution.iter() {
             let amount = (n as i128)
                 .checked_mul(shared.payout_rate)
                 .ok_or(Error::InvalidSettlement)?;
             if amount > 0 {
-                client.transfer(&owner, &addr, &amount);
+                total = total.checked_add(amount).ok_or(Error::InvalidSettlement)?;
                 out.push_back(Payout { to: addr, amount });
             }
         }
 
+        // Checks-effects-interactions: guard the period before *any* call to the
+        // external token contract, including allowance/balance reads. A hostile
+        // token must not re-enter this period before the guard exists. Soroban
+        // rolls the write back atomically if a later check or transfer fails.
         env.storage().persistent().set(&settled_key, &true);
         env.storage()
             .persistent()
             .extend_ttl(&settled_key, LEDGER_BUMP, EXTEND_TO);
 
-        env.events().publish(
-            (symbol_short!("tally"), symbol_short!("settle")),
-            (campaign_id, period, token, shared.payout_rate),
-        );
+        // The allowance is explicit, inspectable and consumed by transfer_from;
+        // the owner no longer has to co-sign each settlement invocation.
+        if client.allowance(&owner, &spender) < total || client.balance(&owner) < total {
+            return Err(Error::InvalidSettlement);
+        }
+
+        for payout in out.iter() {
+            client.transfer_from(&spender, &owner, &payout.to, &payout.amount);
+        }
+
+        TallySettled {
+            campaign_id,
+            period,
+            token,
+            payout_rate: shared.payout_rate,
+        }
+        .publish(&env);
         Ok(out)
     }
 
@@ -1008,6 +1205,12 @@ mod test {
         codes
     }
 
+    fn assert_single_auth(env: &Env, expected: &Address) {
+        let auths = env.auths();
+        assert_eq!(auths.len(), 1);
+        assert_eq!(&auths[0].0, expected);
+    }
+
     /// End-to-end Burn lifecycle in the permissionless model.
     #[test]
     fn test_permissionless_lifecycle() {
@@ -1054,6 +1257,63 @@ mod test {
         assert_eq!(stats.minted, 2);
         assert_eq!(stats.burned, 1);
         assert_eq!(stats.available, 1);
+    }
+
+    /// Recording-mode auth assertions catch accidental removal of require_auth;
+    /// mock_all_auths alone would otherwise let privileged calls keep passing.
+    #[test]
+    fn test_privileged_entrypoints_require_the_expected_signer() {
+        let (env, client) = setup();
+        let owner = Address::generate(&env);
+        let delegate = Address::generate(&env);
+
+        let campaign_id = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "Auth"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &10,
+            &9999999999,
+        );
+        assert_single_auth(&env, &owner);
+
+        let mut codes = Vec::new(&env);
+        codes.push_back(String::from_str(&env, "AUTH-1"));
+        client.issue_unique(&owner, &campaign_id, &codes);
+        assert_single_auth(&env, &owner);
+
+        client.add_delegate(&owner, &campaign_id, &delegate);
+        assert_single_auth(&env, &owner);
+        client.redeem_unique(
+            &delegate,
+            &campaign_id,
+            &String::from_str(&env, "AUTH-1"),
+            &redeemer_hash(&env, 4),
+        );
+        assert_single_auth(&env, &delegate);
+
+        client.register_shared(
+            &owner,
+            &campaign_id,
+            &String::from_str(&env, "AUTH-SHARED"),
+            &None,
+            &None,
+            &0,
+        );
+        assert_single_auth(&env, &owner);
+        client.commit_tally(
+            &owner,
+            &campaign_id,
+            &String::from_str(&env, "AUTH-SHARED"),
+            &1,
+            &1,
+            &BytesN::from_array(&env, &[9u8; 32]),
+            &Map::new(&env),
+        );
+        assert_single_auth(&env, &owner);
+
+        client.remove_delegate(&owner, &campaign_id, &delegate);
+        assert_single_auth(&env, &owner);
     }
 
     /// Two independent owners coexist; neither can touch the other's campaign.
@@ -1220,6 +1480,18 @@ mod test {
 
         assert_eq!(client.campaigns_of(&b).get(0).unwrap(), b1);
         assert_eq!(client.campaigns_of(&Address::generate(&env)).len(), 0);
+
+        let page1 = client.campaigns_page(&a, &0u64, &1u32);
+        let page2 = client.campaigns_page(&a, &1u64, &10u32);
+        assert_eq!(page1.len(), 1);
+        assert_eq!(page1.get(0).unwrap(), a1);
+        assert_eq!(page2.len(), 1);
+        assert_eq!(page2.get(0).unwrap(), a2);
+        assert_eq!(client.campaigns_page(&a, &99u64, &10u32).len(), 0);
+        assert_eq!(
+            client.try_campaigns_page(&a, &0u64, &0u32),
+            Err(Ok(Error::BatchTooLarge))
+        );
     }
 
     #[test]
@@ -1237,6 +1509,34 @@ mod test {
         client.bump_campaign(&cid); // ok
         assert_eq!(
             client.try_bump_campaign(&999u64),
+            Err(Ok(Error::CampaignNotFound))
+        );
+    }
+
+    #[test]
+    fn test_bump_delegates() {
+        let (env, client) = setup();
+        let owner = Address::generate(&env);
+        let delegate = Address::generate(&env);
+        let unknown = Address::generate(&env);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "Long-running delegation"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &10,
+            &9999999999,
+        );
+        client.add_delegate(&owner, &cid, &delegate);
+
+        let mut delegates = Vec::new(&env);
+        delegates.push_back(delegate.clone());
+        delegates.push_back(unknown); // unknown entries are intentionally skipped
+        client.bump_delegates(&cid, &delegates);
+
+        assert!(client.is_delegate(&cid, &delegate));
+        assert_eq!(
+            client.try_bump_delegates(&999u64, &delegates),
             Err(Ok(Error::CampaignNotFound))
         );
     }
@@ -1478,11 +1778,12 @@ mod test {
             &cid,
             &code,
             &1u64,
-            &40u32,
+            &30u32,
             &BytesN::from_array(&env, &[9u8; 32]),
             &attr,
         );
-        assert_eq!(client.get_tally(&cid, &code, &1u64).count, 40);
+        assert_eq!(client.get_tally(&cid, &code, &1u64).count, 30);
+        assert!(!client.is_settled(&cid, &code, &1u64));
 
         // preview uses the code's fixed rate (no rate arg) → 30 * 5 = 150
         assert_eq!(
@@ -1495,7 +1796,9 @@ mod test {
         );
 
         token::StellarAssetClient::new(&env, &token_addr).mint(&owner, &1000i128);
+        token::Client::new(&env, &token_addr).approve(&owner, &client.address, &150i128, &100u32);
         let payouts = client.settle(&owner, &cid, &code, &1u64);
+        assert!(client.is_settled(&cid, &code, &1u64));
         assert_eq!(payouts.len(), 1);
         assert_eq!(
             token::Client::new(&env, &token_addr).balance(&creator),
@@ -1505,6 +1808,52 @@ mod test {
             token::Client::new(&env, &token_addr).balance(&owner),
             850i128
         );
+    }
+
+    /// The CEI guard is written before token calls, but a failed allowance
+    /// check must roll it back so the owner can approve and retry later.
+    #[test]
+    fn test_failed_settlement_rolls_back_guard() {
+        use soroban_sdk::token;
+        let (env, client) = setup();
+        let owner = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
+        let code = String::from_str(&env, "RETRY");
+        let sac = env.register_stellar_asset_contract_v2(Address::generate(&env));
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &Some(creator.clone()),
+            &Some(sac.address()),
+            &5i128,
+        );
+        let mut attr = Map::new(&env);
+        attr.set(creator, 10u32);
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &10u32,
+            &BytesN::from_array(&env, &[3u8; 32]),
+            &attr,
+        );
+        token::StellarAssetClient::new(&env, &sac.address()).mint(&owner, &100i128);
+
+        assert_eq!(
+            client.try_settle(&owner, &cid, &code, &1u64),
+            Err(Ok(Error::InvalidSettlement))
+        );
+        assert!(!client.is_settled(&cid, &code, &1u64));
     }
 
     /// A code registered to creator A cannot credit B — attribution is binding.
@@ -1595,7 +1944,7 @@ mod test {
             &0i128,
         ); // no token
         let mut attr = Map::new(&env);
-        attr.set(creator.clone(), 5u32);
+        attr.set(creator.clone(), 10u32);
         client.commit_tally(
             &owner,
             &cid,
@@ -1645,6 +1994,7 @@ mod test {
             &attr,
         );
         token::StellarAssetClient::new(&env, &sac.address()).mint(&owner, &1000i128);
+        token::Client::new(&env, &sac.address()).approve(&owner, &client.address, &50i128, &100u32);
         client.settle(&owner, &cid, &code, &1u64);
         client.settle(&owner, &cid, &code, &1u64); // #16
     }
@@ -1724,6 +2074,44 @@ mod test {
             &1u64,
             &10u32,
             &BytesN::from_array(&env, &[0u8; 32]),
+            &attr,
+        );
+    }
+
+    /// An attributed shared code cannot hide conversions from its registered
+    /// creator. Partial attribution would make settlement underpay.
+    #[test]
+    #[should_panic(expected = "Error(Contract, #17)")]
+    fn test_attribution_below_count_rejected() {
+        let (env, client) = setup();
+        let owner = Address::generate(&env);
+        let creator = Address::generate(&env);
+        let cid = client.create_campaign(
+            &owner,
+            &String::from_str(&env, "UGC"),
+            &String::from_str(&env, "percentage"),
+            &1000,
+            &1000,
+            &9999999999,
+        );
+        let code = String::from_str(&env, "PARTIAL");
+        client.register_shared(
+            &owner,
+            &cid,
+            &code,
+            &Some(creator.clone()),
+            &None::<Address>,
+            &0i128,
+        );
+        let mut attr = Map::new(&env);
+        attr.set(creator, 9u32); // 9 < count 10 → #17
+        client.commit_tally(
+            &owner,
+            &cid,
+            &code,
+            &1u64,
+            &10u32,
+            &BytesN::from_array(&env, &[2u8; 32]),
             &attr,
         );
     }
@@ -1889,7 +2277,7 @@ mod test {
             &0i128,
         );
         let mut attr = Map::new(&env);
-        attr.set(creator.clone(), 5u32);
+        attr.set(creator.clone(), 10u32);
         client.commit_tally(
             &owner,
             &cid,
