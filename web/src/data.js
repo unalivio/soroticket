@@ -8,8 +8,8 @@
     network: "testnet",
     passphrase: "Test SDF Network ; September 2015",
     rpc: "https://soroban-testnet.stellar.org",
-    contractId: "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX",
-    contractStatus: "deprecated-v0.1",
+    contractId: "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF",
+    contractStatus: "v0.2.0-testnet-preview",
     ownerWallet: "GCIJM67CD2U6XPI5GYS5VYSNIYOKLH7DZ4XA3W45PID7DYCRYFTRDSV6",
     explorer: "https://stellar.expert/explorer/testnet",
   };
@@ -132,7 +132,7 @@
     return [
       `// go get github.com/sorodeal/sorodeal-go`,
       `kp := keypair.MustParseFull(os.Getenv("SORODEAL_SECRET"))`,
-      `// Compatibility preset: deprecated v0.1 testnet contract.`,
+      `// Testnet preset: current v0.2.0 testnet deployment.`,
       `client, err := sorodeal.Testnet(kp)`,
       `if err != nil { return err }`,
       `defer client.Close()`,

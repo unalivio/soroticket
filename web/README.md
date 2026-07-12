@@ -3,9 +3,9 @@
 Interactive developer playground for the Sorodeal coupon protocol, signing with
 Freighter on Stellar testnet.
 
-> It currently calls the real but **deprecated v0.1** deployment. Candidate
-> v0.2 is built/tested locally and is not deployed. Do not treat this playground
-> as a production or real-value environment.
+> It calls the real **v0.2.0 testnet** deployment (2026-07-12). Testnet
+> preview only — do not treat this playground as a production or real-value
+> environment.
 
 ## Run
 
@@ -32,16 +32,19 @@ npm run preview
 
 ## How it works
 
-- **Real legacy contract.** Every write builds, simulates, signs and submits a
-  testnet transaction. Contract v0.1:
-  `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX`; see its known
-  issues in `../deployments/testnet.json`.
+- **Real contract.** Every write builds, simulates, signs and submits a
+  testnet transaction. Contract v0.2.0:
+  `CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF`; deployment
+  record in `../deployments/testnet-v0.2.0.json`. (The deprecated v0.1
+  contract and its known issues remain documented in
+  `../deployments/testnet.json`.)
 - **No PII on-chain.** The redeemer reference is committed in-browser as an opaque, non-reversible 32-byte `redeemer_ref_hash` = SHA-256(random nonce ∥ reference). A public/constant salt would be brute-forceable for low-entropy refs; the random nonce makes it non-reversible and unlinkable (production may HMAC with a merchant pepper). ADR-005/010.
 - **No fake UI state.** On connect, the app loads campaigns from the chain via
   `campaigns_of(owner)`; there are no local/demo campaigns or generated Merkle
-  roots in memory. The legacy chain itself contains a real seeded *Demo Cafe*
-  campaign. Its `ROBERTOX` tally (40 total / 30 attributed) is evidence of the
-  v0.1 flaw and would be rejected by v0.2.
+  roots in memory. The fresh v0.2 deployment starts empty — create your own
+  campaigns. (The old v0.1 chain still holds the historical `ROBERTOX` tally,
+  40 total / 30 attributed: evidence of the v0.1 partial-attribution flaw that
+  v0.2 now rejects.)
 
 ### Try it
 1. **Verify** `DEMO0001` — works immediately, no wallet (public read against the live contract).

@@ -35,9 +35,10 @@ const TestnetRPC = "https://soroban-testnet.stellar.org"
 // review; do not use it for real-value integrations.
 const LegacyTestnetContractID = "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX"
 
-// TestnetContractID is a compatibility alias for LegacyTestnetContractID.
-// Deprecated: pass an explicitly reviewed deployment in Config.ContractID.
-const TestnetContractID = LegacyTestnetContractID
+// TestnetContractID is the current reviewed v0.2.0 testnet deployment
+// (2026-07-12; see deployments/testnet-v0.2.0.json). Testnet preview only —
+// never point real value at it.
+const TestnetContractID = "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF"
 
 // TestnetNativeSAC is the testnet native-XLM Stellar Asset Contract — a handy
 // settlement token for Tally payouts (see deployments/testnet.json).

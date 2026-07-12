@@ -100,7 +100,7 @@ const BENEFITS = [
   { ic: Ic.shield, h: "No plaintext PII on-chain", p: "Redeemer identity can be committed as an opaque 32-byte value computed with a random nonce. Keep the nonce and source reference off-chain." },
   { ic: Ic.globe, h: "Permissionless ownership", p: "Anyone can create a campaign from their own keypair. Each campaign is owned by its creator — there is no global admin." },
   { ic: Ic.users, h: "Delegated redemption", p: "Owners grant explicit delegates the right to redeem at the point of sale, while keeping supply issuance owner-only." },
-  { ic: Ic.spark, h: "Token settlement primitive", p: "Candidate v0.2 can settle a configured Stellar Asset Contract after an owner allowance. Network fees and asset choice remain deployment decisions." },
+  { ic: Ic.spark, h: "Token settlement primitive", p: "Contract v0.2 settles a configured Stellar Asset Contract from an owner-approved allowance — any keeper can trigger it. Network fees and asset choice remain deployment decisions." },
   { ic: Ic.terminal, h: "Generated integration examples", p: "Actions produce Stellar CLI, TypeScript and Go examples from your inputs. Review deployment IDs, addresses and signer handling before running them." },
 ];
 function Benefits() {

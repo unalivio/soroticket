@@ -144,8 +144,8 @@ function Hero() {
             <h1 className="display">Issue, redeem &amp; verify coupons on-chain.</h1>
             <p className="lede">
               Sorodeal is a permissionless protocol for tokenized coupons and redeemable codes on
-              Stellar Soroban. This playground calls the real but deprecated v0.1 testnet
-              deployment. Candidate v0.2 is built and tested, but is not deployed yet.
+              Stellar Soroban. This playground calls the real v0.2.0 testnet deployment —
+              a preview environment: testnet only, never real value.
             </p>
             <div className="cta-row">
               {!wallet ? (

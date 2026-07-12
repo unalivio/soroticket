@@ -4,11 +4,12 @@ TypeScript/JavaScript SDK for the **Sorodeal** coupon protocol on Stellar
 Soroban — Burn (unique tokens) and Tally (shared codes + settlement). Works in
 the browser (Freighter) and on the server (keypair).
 
-The typed contract `Client` is generated from candidate v0.2 (`stellar contract
-bindings typescript`). Candidate v0.2 is not deployed. The `TESTNET`/
-`LEGACY_TESTNET` compatibility preset still points to deprecated v0.1, so
-v0.2-only calls such as `campaigns_page` and `is_settled` will not work with
-that preset. New integrations must pass an explicitly reviewed deployment ID.
+The typed contract `Client` is generated from v0.2.0 (`stellar contract
+bindings typescript`), deployed to testnet on 2026-07-12. The `TESTNET` preset
+points to that deployment (`deployments/testnet-v0.2.0.json`), including the
+v0.2-only calls `campaigns_page` and `is_settled`. `LEGACY_TESTNET` remains the
+deprecated v0.1 contract, where those calls do not exist. Testnet preview —
+never point real value at either.
 
 ```bash
 npm install   # then: npm run build
@@ -116,5 +117,6 @@ typed-`Client` users recover the code the bindings drop.
   `bigint`. The low-level convenience client accepts `number|bigint|string` and
   throws rather than silently returning an unsafe JavaScript integer.
 - Errors surface as the contract's `Errors` map (1–19), re-exported here.
-- `LEGACY_TESTNET` and deprecated alias `TESTNET` are the vulnerable v0.1
-  compatibility deployment, not candidate v0.2. Never use them for real value.
+- `TESTNET` is the current v0.2.0 testnet deployment. `LEGACY_TESTNET` is the
+  vulnerable v0.1 deployment, kept only for historical reads. Never use either
+  for real value.

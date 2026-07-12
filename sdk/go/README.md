@@ -4,10 +4,10 @@ Go SDK for the **Sorodeal** coupon protocol on Stellar Soroban — the **Burn**
 profile (unique single-use codes) and the **Tally** profile (shared codes +
 settlement).
 
-> The compatibility default is the deprecated v0.1 testnet deployment. Its
-> partial-attribution settlement flaw cannot be patched. For candidate v0.2
-> methods, pass an explicitly deployed/reviewed `Config.ContractID`; the local
-> v0.2 artifact in this repository is not on-chain yet.
+> `TestnetContractID` defaults to the reviewed v0.2.0 testnet deployment
+> (2026-07-12; see `deployments/testnet-v0.2.0.json`). `LegacyTestnetContractID`
+> is the deprecated v0.1 contract — its partial-attribution settlement flaw
+> cannot be patched. Testnet preview: never point real value at either.
 
 Unlike the prototype's `stellar` CLI shell-out, this client **signs in-process**
 with the Go Stellar SDK and talks to Soroban RPC directly: it simulates,
@@ -93,10 +93,10 @@ match the contract `Error` enum / `abi-v0.2.0.txt`. Most are raised at simulatio
 ## Notes
 
 - Token amounts and `u64`/`i128` fields are `uint64` / `*big.Int` — never lossy.
-- `LegacyTestnetContractID` is v0.1. `TestnetContractID` remains only as a
-  deprecated compatibility alias; always configure a reviewed contract for new
-  integrations.
+- `TestnetContractID` is the reviewed v0.2.0 testnet deployment (2026-07-12;
+  see `deployments/testnet-v0.2.0.json`). `LegacyTestnetContractID` is the
+  deprecated v0.1 deployment — do not use it for new integrations.
 - A `Client` is for sequential use; sequence numbers are loaded per call.
 
-Historical E2E apps under `tests/e2e/go` target legacy testnet v0.1. Re-run and
-update them only after candidate v0.2 receives a real deployment ID.
+The E2E apps under `tests/e2e/go` follow the SDK's `TestnetContractID` default,
+so they exercise the v0.2.0 testnet deployment.

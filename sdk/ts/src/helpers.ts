@@ -4,7 +4,15 @@
  * and the off-chain redeemer commitment. The typed `Client` (all contract
  * methods + types + Errors) is re-exported from `./contract`.
  */
-import { Keypair } from "@stellar/stellar-sdk";
+import {
+  Address,
+  BASE_FEE,
+  Contract,
+  Keypair,
+  nativeToScVal,
+  rpc,
+  TransactionBuilder,
+} from "@stellar/stellar-sdk";
 import { basicNodeSigner, type ClientOptions } from "@stellar/stellar-sdk/contract";
 import { Buffer } from "buffer";
 import { Client } from "./contract.js";
@@ -16,8 +24,15 @@ export const LEGACY_TESTNET = {
   rpcUrl: "https://soroban-testnet.stellar.org",
 } as const;
 
-/** @deprecated Pass an explicitly reviewed deployment; this alias is v0.1. */
-export const TESTNET = LEGACY_TESTNET;
+/**
+ * Current reviewed v0.2.0 testnet deployment (2026-07-12; see
+ * deployments/testnet-v0.2.0.json). Testnet preview only — never real value.
+ */
+export const TESTNET = {
+  contractId: "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF",
+  networkPassphrase: "Test SDF Network ; September 2015",
+  rpcUrl: "https://soroban-testnet.stellar.org",
+} as const;
 
 export type SorodealOptions = Partial<ClientOptions>;
 
@@ -53,6 +68,66 @@ export async function freighterSigner(networkPassphrase: string = TESTNET.networ
     signTransaction: (xdr: string, opts?: Record<string, unknown>) =>
       fr.signTransaction(xdr, { networkPassphrase, address: publicKey, ...opts }),
   };
+}
+
+/**
+ * Grant the Sorodeal contract an exact settlement allowance on a SAC payout
+ * token (contract v0.2+). The owner signs `approve(owner, sorodeal, amount,
+ * live_until_ledger)` on the token; any keeper can then trigger `settle` for
+ * the committed period, which consumes the allowance via `transfer_from`.
+ * Approve only the exact period total right before settling — no standing
+ * spend authority should be left behind (`live_until_ledger` defaults to
+ * ~latest + 200).
+ */
+export async function approveSettlement(opts: {
+  ownerSecret: string;
+  payoutToken: string;
+  amount: bigint;
+  liveUntilLedger?: number;
+  contractId?: string;
+  rpcUrl?: string;
+  networkPassphrase?: string;
+}): Promise<void> {
+  const {
+    ownerSecret,
+    payoutToken,
+    amount,
+    contractId = TESTNET.contractId,
+    rpcUrl = TESTNET.rpcUrl,
+    networkPassphrase = TESTNET.networkPassphrase,
+  } = opts;
+  const kp = Keypair.fromSecret(ownerSecret);
+  const server = new rpc.Server(rpcUrl);
+  const live =
+    opts.liveUntilLedger ?? (await server.getLatestLedger()).sequence + 200;
+  const source = await server.getAccount(kp.publicKey());
+  const tx = new TransactionBuilder(source, { fee: BASE_FEE, networkPassphrase })
+    .addOperation(
+      new Contract(payoutToken).call(
+        "approve",
+        new Address(kp.publicKey()).toScVal(),
+        new Address(contractId).toScVal(),
+        nativeToScVal(amount, { type: "i128" }),
+        nativeToScVal(live, { type: "u32" }),
+      ),
+    )
+    .setTimeout(60)
+    .build();
+  // The owner is the transaction source, so simulation resolves the token's
+  // require_auth to source-account credentials — no extra auth signing needed.
+  const prepared = await server.prepareTransaction(tx);
+  prepared.sign(kp);
+  const sent = await server.sendTransaction(prepared);
+  if (sent.status === "ERROR") {
+    throw new Error(`approve submission failed: ${sent.status}`);
+  }
+  for (let i = 0; i < 30; i++) {
+    const res = await server.getTransaction(sent.hash);
+    if (res.status === "SUCCESS") return;
+    if (res.status === "FAILED") throw new Error("approve transaction failed on-chain");
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error("approve transaction was not confirmed in time");
 }
 
 /**
