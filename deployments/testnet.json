@@ -9,6 +9,7 @@
   "status": "deprecated-security-review",
   "deprecatedAt": "2026-07-11",
   "doNotUseForNewIntegrations": true,
+  "supersededBy": "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF (v0.2.0, 2026-07-12; see testnet-v0.2.0.json)",
   "knownIssues": [
     "Attributed tallies accept an attributed count lower than the committed total, allowing creator underpayment.",
     "Settlement requires the owner to authorize every invocation, so it is not automatic or keeper-triggerable.",

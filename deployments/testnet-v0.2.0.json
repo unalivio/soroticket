@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "network": "testnet",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "contractId": "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF",
+  "deployer": "GCIJM67CD2U6XPI5GYS5VYSNIYOKLH7DZ4XA3W45PID7DYCRYFTRDSV6",
+  "wasmHash": "1c6c74f2f43c60aa06939d6e63c49a1809c98a7cebd9555453a4297c5f04c94b",
+  "uploadTx": "0d48e86007ad4fcd8e195e165c122ca324b23acb3bbe7458064b6b27adaf1bb7",
+  "deployTx": "c300e9049f43989018fe29cc94a6d2d806926dc1ab04f0fff5660d007db41f06",
+  "deployedAt": "2026-07-12",
+  "status": "current-testnet-preview",
+  "authorization": "Operator-approved deployment on 2026-07-12 after the 2026-07-11 security review (roadmap gate).",
+  "profiles": ["burn", "tally"],
+  "securityChanges": [
+    "Attributed tally count must equal the committed total.",
+    "Permissionless settlement consumes a bounded token allowance pre-approved by the campaign owner.",
+    "Settlement records its guard before external token calls (checks-effects-interactions).",
+    "Settlement state is publicly queryable with is_settled.",
+    "Delegate TTL entries can be maintained with bump_delegates.",
+    "Owner campaign indexing is O(1) with bounded campaigns_page reads.",
+    "Events use the typed contractevent schema."
+  ],
+  "supersedes": "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX (v0.1, deprecated 2026-07-11; see testnet.json)",
+  "nativeXlmSac": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+  "explorer": "https://stellar.expert/explorer/testnet/contract/CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF",
+  "seed": "none yet — E2E suites create their own fixtures; seed only verified examples"
+}

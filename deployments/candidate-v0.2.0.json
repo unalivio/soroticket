@@ -1,8 +1,11 @@
 {
   "version": "0.2.0",
-  "status": "built-and-tested-not-deployed",
+  "status": "deployed-to-testnet",
   "networkTarget": "testnet",
-  "deployed": false,
+  "deployed": true,
+  "deployedAt": "2026-07-12",
+  "contractId": "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF",
+  "deploymentRecord": "./testnet-v0.2.0.json",
   "builtAt": "2026-07-11",
   "validatedAt": "2026-07-12",
   "sorobanSdk": "27.0.0",
@@ -20,5 +23,5 @@
     "Owner campaign indexing is O(1) with bounded campaigns_page reads.",
     "Events use the typed contractevent schema."
   ],
-  "deploymentNote": "Deploy and reseed only after explicit operator approval; this file is not evidence of an on-chain deployment."
+  "deploymentNote": "Deployed 2026-07-12 with explicit operator approval; the on-chain record (real contract ID and transaction hashes) lives in ./testnet-v0.2.0.json."
 }
