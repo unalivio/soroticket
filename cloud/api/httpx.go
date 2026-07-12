@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"mime"
 	"net/http"
 
 	sd "github.com/sorodeal/sorodeal-go"
@@ -22,13 +25,13 @@ var friendlyErr = map[sd.Code]string{
 	sd.ErrDuplicateCode:       "That code was already issued in this campaign.",
 	sd.ErrInvalidTerms:        "Invalid campaign terms.",
 	sd.ErrBatchTooLarge:       "Batch too large.",
-	sd.ErrCodeTooLong:         "Code is too long (max 64 chars).",
+	sd.ErrCodeTooLong:         "Code is too long (max 64 UTF-8 bytes).",
 	sd.ErrSharedNotFound:      "Shared code not registered.",
 	sd.ErrAlreadyRegistered:   "That shared code is already registered.",
 	sd.ErrPeriodCommitted:     "This period was already committed.",
 	sd.ErrTallyNotFound:       "No tally committed for that period.",
 	sd.ErrAlreadySettled:      "This period was already settled.",
-	sd.ErrInvalidTally:        "Attributed counts exceed the total.",
+	sd.ErrInvalidTally:        "For an attributed code, attributed count must equal the total.",
 	sd.ErrInvalidSettlement:   "Settlement isn't configured for this code.",
 	sd.ErrAttributionMismatch: "Attribution doesn't match the registered creator.",
 }
@@ -67,14 +70,38 @@ func writeErr(w http.ResponseWriter, err error) {
 		})
 		return
 	}
-	writeProblem(w, http.StatusInternalServerError, err.Error())
+	writeInternal(w, err, "request failed")
+}
+
+func writeInternal(w http.ResponseWriter, err error, context string) {
+	log.Printf("%s: %v", context, err)
+	writeProblem(w, http.StatusInternalServerError, "internal server error")
 }
 
 func readBody(r *http.Request, v any) error {
+	return decodeBody(r, v, false)
+}
+
+func readOptionalBody(r *http.Request, v any) error {
+	return decodeBody(r, v, true)
+}
+
+func decodeBody(r *http.Request, v any, optional bool) error {
 	defer r.Body.Close()
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		return errors.New("Content-Type must be application/json")
+	}
 	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20))
+	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
+		if optional && errors.Is(err, io.EOF) {
+			return nil
+		}
 		return fmt.Errorf("invalid JSON body: %w", err)
+	}
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return fmt.Errorf("invalid JSON body: multiple values are not allowed")
 	}
 	return nil
 }

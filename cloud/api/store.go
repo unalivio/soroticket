@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -22,6 +23,11 @@ func openStore(path string) (*sql.DB, error) {
 }
 
 const schema = `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version INTEGER PRIMARY KEY,
+  applied_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
@@ -51,8 +57,19 @@ CREATE TABLE IF NOT EXISTS org_accounts (
   PRIMARY KEY (org_id, env)
 );
 
+-- Dedicated off-chain receipt signer. It is intentionally separate from the
+-- custodial account that holds funds, so receipt traffic never exposes the
+-- settlement key to the hot path.
+CREATE TABLE IF NOT EXISTS org_receipt_keys (
+  org_id INTEGER NOT NULL REFERENCES orgs(id),
+  env TEXT NOT NULL CHECK (env IN ('test','live')),
+  public_key TEXT NOT NULL,
+  secret_enc BLOB NOT NULL,
+  PRIMARY KEY (org_id, env)
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
-  token TEXT PRIMARY KEY,
+  token TEXT PRIMARY KEY,       -- SHA-256 of cookie token; raw bearer never stored
   user_id INTEGER NOT NULL REFERENCES users(id),
   expires_at INTEGER NOT NULL
 );
@@ -140,6 +157,33 @@ CREATE TABLE IF NOT EXISTS shared_events (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS event_receipts (
+  event_id INTEGER PRIMARY KEY REFERENCES shared_events(id),
+  payload BLOB NOT NULL,
+  leaf_hash TEXT NOT NULL,
+  signature TEXT NOT NULL,
+  signer TEXT NOT NULL
+);
+
+-- Optional external event/order references are HMACed before reaching this
+-- table. They prevent a caller from counting the same business event again
+-- under a different HTTP idempotency key.
+CREATE TABLE IF NOT EXISTS operation_dedup (
+  org_id INTEGER NOT NULL,
+  env TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  reference TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (org_id, env, scope, reference)
+);
+INSERT OR IGNORE INTO operation_dedup (org_id, env, scope, reference, created_at)
+SELECT c.org_id, c.env, 'shared:' || e.shared_code_id, e.order_ref, MIN(e.created_at)
+FROM shared_events e
+JOIN shared_codes sc ON sc.id = e.shared_code_id
+JOIN campaigns c ON c.id = sc.campaign_id
+WHERE e.order_ref IS NOT NULL AND e.order_ref <> ''
+GROUP BY c.org_id, c.env, e.shared_code_id, e.order_ref;
+
 CREATE TABLE IF NOT EXISTS tallies (
   id INTEGER PRIMARY KEY,
   shared_code_id INTEGER NOT NULL REFERENCES shared_codes(id),
@@ -207,6 +251,15 @@ CREATE TABLE IF NOT EXISTS credit_ledger (
   tx_hash TEXT
 );
 
+CREATE TABLE IF NOT EXISTS credit_alerts (
+  org_id INTEGER NOT NULL,
+  env TEXT NOT NULL,
+  month TEXT NOT NULL,
+  alert_type TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (org_id, env, month, alert_type)
+);
+
 CREATE TABLE IF NOT EXISTS activity (
   id INTEGER PRIMARY KEY,
   org_id INTEGER NOT NULL,
@@ -230,4 +283,140 @@ CREATE TABLE IF NOT EXISTS idempotency (
   created_at INTEGER NOT NULL,
   PRIMARY KEY (key, org_id, endpoint)
 );
+
+-- v2 reserves a key before executing, preventing concurrent duplicates. The
+-- request HMAC also rejects accidental key reuse across payloads/paths/envs
+-- without exposing a plain low-entropy body fingerprint at rest.
+CREATE TABLE IF NOT EXISTS idempotency_v2 (
+  key TEXT NOT NULL,
+  org_id INTEGER NOT NULL,
+  env TEXT NOT NULL,
+  endpoint TEXT NOT NULL,
+  request_hash TEXT NOT NULL,
+  status INTEGER NOT NULL DEFAULT 0, -- 0 = in progress
+  content_type TEXT NOT NULL DEFAULT 'application/json',
+  body BLOB,
+  created_at INTEGER NOT NULL,
+  completed_at INTEGER,
+  PRIMARY KEY (key, org_id, env, endpoint)
+);
+
+CREATE TABLE IF NOT EXISTS webhooks (
+  id INTEGER PRIMARY KEY,
+  org_id INTEGER NOT NULL REFERENCES orgs(id),
+  env TEXT NOT NULL CHECK (env IN ('test','live')),
+  url TEXT NOT NULL,
+  secret_enc BLOB NOT NULL,
+  secret_prefix TEXT NOT NULL,
+  events TEXT NOT NULL,          -- JSON array of subscribed event names
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  disabled_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_webhooks_org ON webhooks(org_id, env, active);
+
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id INTEGER PRIMARY KEY,
+  webhook_id INTEGER NOT NULL REFERENCES webhooks(id),
+  delivery_id TEXT NOT NULL UNIQUE,
+  event_type TEXT NOT NULL,
+  payload BLOB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending', -- pending|retrying|delivered|failed
+  attempts INTEGER NOT NULL DEFAULT 0,
+  response_status INTEGER,
+  last_error TEXT,
+  next_attempt_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  delivered_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_webhook_delivery_due
+  ON webhook_deliveries(status, next_attempt_at);
 `
+
+// runSecurityMigrations performs one-way transformations that CREATE TABLE
+// cannot express safely. Version 1 invalidates pre-hashing sessions and HMACs
+// legacy plaintext order references. It deliberately does not fabricate signed
+// receipts for historical events.
+func runSecurityMigrations(db *sql.DB, refKey []byte) error {
+	if len(refKey) < 32 {
+		return fmt.Errorf("security migration requires a 32-byte reference key")
+	}
+	var applied int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version=1`).Scan(&applied); err != nil {
+		return fmt.Errorf("read security migration state: %w", err)
+	}
+	if applied == 1 {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin security migration: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Old rows stored the raw 32-byte session token. There is no reliable marker
+	// distinguishing it from a SHA-256 hex digest, so force a one-time logout.
+	if _, err = tx.Exec(`DELETE FROM sessions`); err != nil {
+		return fmt.Errorf("invalidate legacy sessions: %w", err)
+	}
+
+	type legacyOrder struct {
+		eventID, sharedID, orgID, chainID int64
+		env, code, reference              string
+	}
+	rows, err := tx.Query(`SELECT e.id, e.shared_code_id, c.org_id, c.env, c.chain_id, sc.code, e.order_ref
+	  FROM shared_events e
+	  JOIN shared_codes sc ON sc.id=e.shared_code_id
+	  JOIN campaigns c ON c.id=sc.campaign_id
+	  LEFT JOIN event_receipts er ON er.event_id=e.id
+	  WHERE er.event_id IS NULL AND e.order_ref IS NOT NULL AND e.order_ref<>''`)
+	if err != nil {
+		return fmt.Errorf("load legacy order references: %w", err)
+	}
+	legacy := []legacyOrder{}
+	for rows.Next() {
+		var item legacyOrder
+		if err = rows.Scan(&item.eventID, &item.sharedID, &item.orgID, &item.env, &item.chainID, &item.code, &item.reference); err != nil {
+			rows.Close()
+			return fmt.Errorf("decode legacy order reference: %w", err)
+		}
+		legacy = append(legacy, item)
+	}
+	rowsErr := rows.Err()
+	rows.Close()
+	if rowsErr != nil {
+		return fmt.Errorf("read legacy order references: %w", rowsErr)
+	}
+	for _, item := range legacy {
+		domain := fmt.Sprintf("org:%d|env:%s|campaign:%d|code:%s|order", item.orgID, item.env, item.chainID, item.code)
+		hashed := opaqueReference(refKey, domain, item.reference)
+		if _, err = tx.Exec(`UPDATE shared_events SET order_ref=? WHERE id=?`, hashed, item.eventID); err != nil {
+			return fmt.Errorf("migrate legacy order reference: %w", err)
+		}
+		scope := fmt.Sprintf("shared:%d", item.sharedID)
+		if _, err = tx.Exec(`DELETE FROM operation_dedup
+		  WHERE org_id=? AND env=? AND scope=? AND reference=?`, item.orgID, item.env, scope, item.reference); err != nil {
+			return fmt.Errorf("remove plaintext dedup reference: %w", err)
+		}
+		if _, err = tx.Exec(`INSERT OR IGNORE INTO operation_dedup
+		  (org_id,env,scope,reference,created_at) VALUES (?,?,?,?,?)`,
+			item.orgID, item.env, scope, hashed, time.Now().Unix()); err != nil {
+			return fmt.Errorf("index migrated order reference: %w", err)
+		}
+	}
+	// Historical events predate signed receipts. They are preserved for export
+	// and totals but quarantined from the new commit queue; signing them now
+	// would manufacture an attestation that did not exist when they occurred.
+	if _, err = tx.Exec(`UPDATE shared_events SET committed_period=-1
+	  WHERE committed_period IS NULL AND NOT EXISTS
+	  (SELECT 1 FROM event_receipts er WHERE er.event_id=shared_events.id)`); err != nil {
+		return fmt.Errorf("quarantine legacy unsigned events: %w", err)
+	}
+	if _, err = tx.Exec(`INSERT INTO schema_migrations (version,applied_at) VALUES (1,?)`, time.Now().Unix()); err != nil {
+		return fmt.Errorf("record security migration: %w", err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit security migration: %w", err)
+	}
+	return nil
+}

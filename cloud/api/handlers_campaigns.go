@@ -15,11 +15,12 @@ import (
 )
 
 const (
-	maxBatch   = 100 // contract MAX_BATCH
-	maxCodeLen = 64
+	maxBatch        = 100 // contract MAX_BATCH
+	maxCodeLen      = 64
+	maxReferenceLen = 512
 )
 
-var kindLabels = map[string]bool{"coupon": true, "creator": true, "voucher": true, "ticket": true, "loyalty": true}
+var kindLabels = map[string]bool{"coupon": true, "creator": true, "voucher": true, "ticket": true}
 
 type campaignOut struct {
 	ID            int64  `json:"id"`
@@ -38,7 +39,9 @@ type campaignOut struct {
 	SharedCode    string `json:"shared_code,omitempty"`
 	AttributedTo  string `json:"attributed_to,omitempty"`
 	PayoutRate    string `json:"payout_rate,omitempty"`
-	Events30d     int64  `json:"events_30d,omitempty"`
+	EventsTotal   int64  `json:"events_total,omitempty"`
+	PendingEvents int64  `json:"pending_events,omitempty"`
+	LegacyEvents  int64  `json:"legacy_unsigned_events,omitempty"`
 }
 
 func (s *server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
@@ -61,24 +64,82 @@ func (s *server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !kindLabels[in.Kind] {
-		writeProblem(w, 400, "kind must be one of coupon|creator|voucher|ticket|loyalty")
+		writeProblem(w, 400, "kind must be one of coupon|creator|voucher|ticket; create loyalty through /v1/loyalty/programs")
 		return
 	}
-	if strings.TrimSpace(in.Name) == "" || in.DiscountType == "" {
+	in.Name = strings.TrimSpace(in.Name)
+	in.DiscountType = strings.TrimSpace(in.DiscountType)
+	if in.Name == "" || len(in.Name) > 96 || in.DiscountType == "" || len(in.DiscountType) > 32 {
 		writeProblem(w, 400, "name and discount_type are required")
+		return
+	}
+	if in.DiscountValue < 0 {
+		writeProblem(w, 400, "discount_value cannot be negative")
 		return
 	}
 	if in.ValidUntil == 0 {
 		in.ValidUntil = time.Now().AddDate(1, 0, 0).Unix()
 	}
-	if in.TotalSupply <= 0 {
-		in.TotalSupply = 10_000 // shared/loyalty campaigns don't mint up-front; give headroom for vouchers
+	if in.ValidUntil <= time.Now().Unix() {
+		writeProblem(w, 400, "valid_until must be in the future")
+		return
 	}
 	isShared := in.Kind == "coupon" || in.Kind == "creator"
+	if in.TotalSupply == 0 {
+		if !isShared {
+			writeProblem(w, 400, "total_supply is required for voucher/ticket campaigns")
+			return
+		}
+		in.TotalSupply = 10_000 // shared campaigns do not mint unique codes up-front
+	}
+	if in.TotalSupply < 0 || in.TotalSupply > int64(^uint32(0)) {
+		writeProblem(w, 400, "total_supply must fit an unsigned 32-bit integer")
+		return
+	}
 	if isShared && (in.Shared == nil || strings.TrimSpace(in.Shared.Code) == "") {
 		writeProblem(w, 400, "shared.code is required for coupon/creator campaigns")
 		return
 	}
+
+	var sharedCode string
+	var sharedAttr, sharedToken *string
+	sharedRate := big.NewInt(0)
+	if isShared {
+		sharedCode = strings.ToUpper(strings.TrimSpace(in.Shared.Code))
+		if len(sharedCode) > maxCodeLen {
+			writeProblem(w, 400, "shared.code exceeds 64 UTF-8 bytes")
+			return
+		}
+		if in.Kind == "creator" {
+			at := strings.TrimSpace(in.Shared.AttributedTo)
+			if !validStellarAddress(at) {
+				writeProblem(w, 400, "attributed_to must be a valid Stellar account or contract address")
+				return
+			}
+			sharedAttr = &at
+			if in.Shared.PayoutRate != "" && in.Shared.PayoutRate != "0" {
+				var ok bool
+				sharedRate, ok = new(big.Int).SetString(in.Shared.PayoutRate, 10)
+				if !ok || sharedRate.Sign() <= 0 || sharedRate.BitLen() > 127 {
+					writeProblem(w, 400, "payout_rate must be a positive i128 integer (token base-units)")
+					return
+				}
+				t := payoutToken
+				sharedToken = &t
+			}
+		}
+	}
+
+	totalCharge := int64(mcrCreateCampaign)
+	if isShared {
+		totalCharge += mcrRegisterShared
+	}
+	reservation, ok := s.reserveCharge(w, a, "create_campaign", in.Name, totalCharge)
+	if !ok {
+		return
+	}
+	usedCharge := int64(0)
+	defer func() { reservation.CommitUsed(usedCharge) }()
 
 	c, release, err := s.clientFor(a.OrgID, a.Env)
 	if err != nil {
@@ -93,55 +154,34 @@ func (s *server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	campaignTx := c.LastTransactionHash()
+	usedCharge += mcrCreateCampaign
 	now := time.Now().Unix()
 	res, err := s.db.Exec(`INSERT INTO campaigns
-	  (org_id, env, chain_id, kind, name, discount_type, discount_value, total_supply, valid_until, created_at)
-	  VALUES (?,?,?,?,?,?,?,?,?,?)`,
-		a.OrgID, a.Env, chainID, in.Kind, in.Name, in.DiscountType, in.DiscountValue, in.TotalSupply, in.ValidUntil, now)
+	  (org_id, env, chain_id, kind, name, discount_type, discount_value, total_supply, valid_until, tx_hash, created_at)
+	  VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		a.OrgID, a.Env, chainID, in.Kind, in.Name, in.DiscountType, in.DiscountValue, in.TotalSupply, in.ValidUntil, campaignTx, now)
 	if err != nil {
-		writeProblem(w, 500, err.Error())
+		writeInternal(w, err, "index created campaign")
 		return
 	}
 	id, _ := res.LastInsertId()
-
-	if !s.charge(w, a, "create_campaign", in.Name, mcrCreateCampaign, "") {
-		return
-	}
-	s.logActivity(a, "campaign", "", "Campaign created · "+in.Name, "", &id, 0)
+	s.logActivity(a, "campaign", "", "Campaign created · "+in.Name, campaignTx, &id, 0)
 
 	// shared kinds register their code in the same flow (wizard step 2)
 	if isShared {
-		code := strings.ToUpper(strings.TrimSpace(in.Shared.Code))
-		var attr, tok *string
-		rate := big.NewInt(0)
-		if in.Kind == "creator" {
-			at := strings.TrimSpace(in.Shared.AttributedTo)
-			if at == "" {
-				writeProblem(w, 400, "attributed_to (creator address) is required for creator codes")
-				return
-			}
-			attr = &at
-			if in.Shared.PayoutRate != "" && in.Shared.PayoutRate != "0" {
-				var ok bool
-				rate, ok = new(big.Int).SetString(in.Shared.PayoutRate, 10)
-				if !ok || rate.Sign() < 0 {
-					writeProblem(w, 400, "payout_rate must be a non-negative integer (token base-units)")
-					return
-				}
-				t := payoutToken
-				tok = &t
-			}
-		}
-		if err := c.RegisterShared(r.Context(), chainID, code, attr, tok, rate); err != nil {
+		if err := c.RegisterShared(r.Context(), chainID, sharedCode, sharedAttr, sharedToken, sharedRate); err != nil {
 			writeErr(w, err)
 			return
 		}
-		_, _ = s.db.Exec(`INSERT INTO shared_codes (campaign_id, code, attributed_to, payout_token, payout_rate, created_at)
-		  VALUES (?,?,?,?,?,?)`, id, code, attr, tok, rate.String(), now)
-		if !s.charge(w, a, "register_shared", code, mcrRegisterShared, "") {
+		sharedTx := c.LastTransactionHash()
+		usedCharge += mcrRegisterShared
+		if _, err := s.db.Exec(`INSERT INTO shared_codes (campaign_id, code, attributed_to, payout_token, payout_rate, tx_hash, created_at)
+		  VALUES (?,?,?,?,?,?,?)`, id, sharedCode, sharedAttr, sharedToken, sharedRate.String(), sharedTx, now); err != nil {
+			writeProblem(w, 500, "shared code was registered on-chain but could not be indexed locally")
 			return
 		}
-		s.logActivity(a, "campaign", code, "Shared code registered · "+code, "", &id, 0)
+		s.logActivity(a, "campaign", sharedCode, "Shared code registered · "+sharedCode, sharedTx, &id, 0)
 	}
 
 	out, _ := s.campaignByID(a, id)
@@ -162,15 +202,23 @@ func (s *server) campaignByID(a *authCtx, id int64) (*campaignOut, error) {
 	var code string
 	var attr sql.NullString
 	var rate string
-	if err := s.db.QueryRow(`SELECT code, attributed_to, payout_rate FROM shared_codes WHERE campaign_id = ? ORDER BY id LIMIT 1`,
-		id).Scan(&code, &attr, &rate); err == nil {
+	err := s.db.QueryRow(`SELECT code, attributed_to, payout_rate FROM shared_codes WHERE campaign_id = ? ORDER BY id LIMIT 1`,
+		id).Scan(&code, &attr, &rate)
+	if err == nil {
 		o.SharedCode = code
 		if attr.Valid {
 			o.AttributedTo = attr.String
 		}
 		o.PayoutRate = rate
-		_ = s.db.QueryRow(`SELECT COALESCE(SUM(e.count),0) FROM shared_events e
-		  JOIN shared_codes sc ON sc.id = e.shared_code_id WHERE sc.campaign_id = ?`, id).Scan(&o.Events30d)
+		if err := s.db.QueryRow(`SELECT COALESCE(SUM(e.count),0),
+		  COALESCE(SUM(CASE WHEN e.committed_period IS NULL THEN e.count ELSE 0 END),0),
+		  COALESCE(SUM(CASE WHEN e.committed_period = -1 THEN e.count ELSE 0 END),0)
+		  FROM shared_events e JOIN shared_codes sc ON sc.id = e.shared_code_id
+		  WHERE sc.campaign_id = ?`, id).Scan(&o.EventsTotal, &o.PendingEvents, &o.LegacyEvents); err != nil {
+			return nil, err
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
 	}
 	return &o, nil
 }
@@ -179,21 +227,33 @@ func (s *server) handleListCampaigns(w http.ResponseWriter, r *http.Request) {
 	a := authFrom(r)
 	rows, err := s.db.Query(`SELECT id FROM campaigns WHERE org_id = ? AND env = ? ORDER BY id DESC`, a.OrgID, a.Env)
 	if err != nil {
-		writeProblem(w, 500, err.Error())
+		writeInternal(w, err, "list campaigns")
 		return
 	}
 	ids := []int64{}
 	for rows.Next() {
 		var id int64
-		_ = rows.Scan(&id)
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			writeInternal(w, err, "decode campaign id")
+			return
+		}
 		ids = append(ids, id)
 	}
+	rowsErr := rows.Err()
 	rows.Close()
+	if rowsErr != nil {
+		writeInternal(w, rowsErr, "read campaigns")
+		return
+	}
 	out := []*campaignOut{}
 	for _, id := range ids {
-		if c, err := s.campaignByID(a, id); err == nil {
-			out = append(out, c)
+		c, err := s.campaignByID(a, id)
+		if err != nil {
+			writeInternal(w, err, "load campaign")
+			return
 		}
+		out = append(out, c)
 	}
 	writeJSON(w, 200, map[string]any{"campaigns": out})
 }
@@ -208,27 +268,53 @@ func (s *server) handleGetCampaign(w http.ResponseWriter, r *http.Request) {
 	}
 	// codes list (Burn side)
 	codes := []map[string]any{}
-	rows, _ := s.db.Query(`SELECT code, status, COALESCE(token_id,0), COALESCE(tx_hash,''), created_at, COALESCE(redeemed_at,0)
+	rows, err := s.db.Query(`SELECT code, status, COALESCE(token_id,0), COALESCE(tx_hash,''), created_at, COALESCE(redeemed_at,0)
 	  FROM codes WHERE campaign_id = ? ORDER BY id DESC LIMIT 500`, id)
+	if err != nil {
+		writeInternal(w, err, "load campaign codes")
+		return
+	}
 	for rows.Next() {
 		var code, status, tx string
 		var tokenID, created, redeemed int64
-		_ = rows.Scan(&code, &status, &tokenID, &tx, &created, &redeemed)
+		if err := rows.Scan(&code, &status, &tokenID, &tx, &created, &redeemed); err != nil {
+			rows.Close()
+			writeInternal(w, err, "decode campaign code")
+			return
+		}
 		codes = append(codes, map[string]any{
 			"code": code, "status": status, "token_id": tokenID, "tx_hash": tx,
 			"created_at": created, "redeemed_at": redeemed,
 		})
 	}
+	rowsErr := rows.Err()
 	rows.Close()
+	if rowsErr != nil {
+		writeInternal(w, rowsErr, "read campaign codes")
+		return
+	}
 	writeJSON(w, 200, map[string]any{"campaign": c, "codes": codes})
 }
 
 func (s *server) handleArchiveCampaign(w http.ResponseWriter, r *http.Request) {
 	a := authFrom(r)
-	id := r.PathValue("id")
-	_, err := s.db.Exec(`UPDATE campaigns SET archived = 1 WHERE id = ? AND org_id = ? AND env = ?`, id, a.OrgID, a.Env)
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeProblem(w, 404, "campaign not found")
+		return
+	}
+	result, err := s.db.Exec(`UPDATE campaigns SET archived = 1 WHERE id = ? AND org_id = ? AND env = ?`, id, a.OrgID, a.Env)
 	if err != nil {
-		writeProblem(w, 500, err.Error())
+		writeInternal(w, err, "archive campaign")
+		return
+	}
+	updated, err := result.RowsAffected()
+	if err != nil {
+		writeInternal(w, err, "confirm archived campaign")
+		return
+	}
+	if updated == 0 {
+		writeProblem(w, 404, "campaign not found")
 		return
 	}
 	writeJSON(w, 200, map[string]any{"ok": true})
@@ -238,17 +324,20 @@ func (s *server) handleArchiveCampaign(w http.ResponseWriter, r *http.Request) {
 
 const codeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789" // no 0/O/1/I/L
 
-func genCode(prefix string, n int) string {
-	b := make([]byte, n)
-	_, _ = rand.Read(b)
+func genCode(prefix string, n int) (string, error) {
 	out := make([]byte, n)
-	for i := range b {
-		out[i] = codeAlphabet[int(b[i])%len(codeAlphabet)]
+	bound := big.NewInt(int64(len(codeAlphabet)))
+	for i := range out {
+		v, err := rand.Int(rand.Reader, bound)
+		if err != nil {
+			return "", err
+		}
+		out[i] = codeAlphabet[v.Int64()]
 	}
 	if prefix != "" {
-		return prefix + "-" + string(out)
+		return prefix + "-" + string(out), nil
 	}
-	return string(out)
+	return string(out), nil
 }
 
 func (s *server) handleIssueCodes(w http.ResponseWriter, r *http.Request) {
@@ -257,6 +346,10 @@ func (s *server) handleIssueCodes(w http.ResponseWriter, r *http.Request) {
 	c, err := s.campaignByID(a, id)
 	if err != nil {
 		writeProblem(w, 404, "campaign not found")
+		return
+	}
+	if c.Archived {
+		writeProblem(w, http.StatusConflict, "campaign is archived")
 		return
 	}
 	var in struct {
@@ -278,8 +371,22 @@ func (s *server) handleIssueCodes(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if in.Generate != nil && in.Generate.Count > 0 {
+		if in.Generate.Count > 1000 || len(codes) > 1000-in.Generate.Count {
+			writeProblem(w, 400, "max 1000 codes per request")
+			return
+		}
+		prefix := strings.ToUpper(strings.TrimSpace(in.Generate.Prefix))
+		if len(prefix)+1+12 > maxCodeLen {
+			writeProblem(w, 400, "generated-code prefix is too long")
+			return
+		}
 		for i := 0; i < in.Generate.Count; i++ {
-			codes = append(codes, genCode(strings.ToUpper(strings.TrimSpace(in.Generate.Prefix)), 8))
+			generated, err := genCode(prefix, 12)
+			if err != nil {
+				writeProblem(w, 500, "secure randomness unavailable")
+				return
+			}
+			codes = append(codes, generated)
 		}
 	}
 	if len(codes) == 0 {
@@ -296,6 +403,20 @@ func (s *server) handleIssueCodes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	seen := make(map[string]struct{}, len(codes))
+	for _, cd := range codes {
+		if _, exists := seen[cd]; exists {
+			writeProblem(w, 400, fmt.Sprintf("duplicate code %q in request", cd))
+			return
+		}
+		seen[cd] = struct{}{}
+	}
+
+	reservation, ok := s.reserveCharge(w, a, "issue_codes", fmt.Sprintf("%d codes · %s", len(codes), c.Name), int64(len(codes))*mcrIssuePerCode)
+	if !ok {
+		return
+	}
+	defer reservation.Refund()
 
 	cl, release, err := s.clientFor(a.OrgID, a.Env)
 	if err != nil {
@@ -306,6 +427,7 @@ func (s *server) handleIssueCodes(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().Unix()
 	issued := []map[string]any{}
+	lastTxHash := ""
 	// chunk to the contract batch bound
 	for start := 0; start < len(codes); start += maxBatch {
 		end := start + maxBatch
@@ -317,27 +439,27 @@ func (s *server) handleIssueCodes(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			// partial success is reported: earlier chunks were applied
 			if len(issued) > 0 {
+				reservation.CommitUsed(int64(len(issued)) * mcrIssuePerCode)
 				writeJSON(w, 207, map[string]any{"issued": issued, "error": problemFromErr(err)})
 				return
 			}
 			writeErr(w, err)
 			return
 		}
+		lastTxHash = cl.LastTransactionHash()
 		for i, cd := range chunk {
 			var tid any
 			if i < len(ids) {
 				tid = ids[i]
 			}
-			_, _ = s.db.Exec(`INSERT INTO codes (campaign_id, code, token_id, created_at) VALUES (?,?,?,?)`,
-				id, cd, tid, now)
-			issued = append(issued, map[string]any{"code": cd, "token_id": tid})
+			_, _ = s.db.Exec(`INSERT INTO codes (campaign_id, code, token_id, tx_hash, created_at) VALUES (?,?,?,?,?)`,
+				id, cd, tid, lastTxHash, now)
+			issued = append(issued, map[string]any{"code": cd, "token_id": tid, "tx_hash": lastTxHash})
 		}
 	}
 	_, _ = s.db.Exec(`UPDATE campaigns SET minted = minted + ? WHERE id = ?`, len(issued), id)
-	if !s.charge(w, a, "issue_codes", fmt.Sprintf("%d codes · %s", len(issued), c.Name), int64(len(issued))*mcrIssuePerCode, "") {
-		return
-	}
-	s.logActivity(a, "issue", "", fmt.Sprintf("%d codes issued · %s", len(issued), c.Name), "", &id, 0)
+	reservation.Commit()
+	s.logActivity(a, "issue", "", fmt.Sprintf("%d codes issued · %s", len(issued), c.Name), lastTxHash, &id, 0)
 	writeJSON(w, 201, map[string]any{"issued": issued})
 }
 
@@ -389,22 +511,42 @@ func (s *server) handleRedeem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in.Code = strings.ToUpper(strings.TrimSpace(in.Code))
+	if len(in.RedeemerRef) > maxReferenceLen {
+		writeProblem(w, 400, "redeemer_ref exceeds 512 bytes")
+		return
+	}
 	c, err := s.campaignByID(a, in.CampaignID)
 	if err != nil {
 		writeProblem(w, 404, "campaign not found")
+		return
+	}
+	if c.Archived {
+		writeProblem(w, http.StatusConflict, "campaign is archived")
 		return
 	}
 
 	// opaque redeemer commitment: SHA-256(random nonce ∥ "|" ∥ ref) — no PII
 	// on-chain, and the platform stores only the hash (ADR-005/010). The nonce
 	// is returned once so the integrator can prove the ref later if they must.
-	nonce := randHex(16)
+	nonce, err := randHex(16)
+	if err != nil {
+		writeProblem(w, 500, "secure randomness unavailable")
+		return
+	}
 	var refHash [32]byte
 	if in.RedeemerRef != "" {
 		refHash = sha256.Sum256([]byte(nonce + "|" + in.RedeemerRef))
 	} else {
-		_, _ = rand.Read(refHash[:])
+		if _, err := rand.Read(refHash[:]); err != nil {
+			writeProblem(w, 500, "secure randomness unavailable")
+			return
+		}
 	}
+	reservation, ok := s.reserveCharge(w, a, "redeem", in.Code+" · "+c.Name, mcrRedeem)
+	if !ok {
+		return
+	}
+	defer reservation.Refund()
 
 	cl, release, err := s.clientFor(a.OrgID, a.Env)
 	if err != nil {
@@ -433,17 +575,16 @@ func (s *server) handleRedeem(w http.ResponseWriter, r *http.Request) {
 		writeRaw(w, p)
 		return
 	}
+	txHash := cl.LastTransactionHash()
+	reservation.Commit()
 	_, _ = s.db.Exec(`INSERT INTO redemptions
 	  (org_id, env, campaign_id, code, ok, redeemer_ref, token_id, ledger_seq, tx_hash, created_at)
 	  VALUES (?,?,?,?,1,?,?,?,?,?)`,
-		a.OrgID, a.Env, in.CampaignID, in.Code, hex.EncodeToString(rec.RedeemerRef), rec.TokenID, rec.LedgerSeq, "", now)
+		a.OrgID, a.Env, in.CampaignID, in.Code, hex.EncodeToString(rec.RedeemerRef), rec.TokenID, rec.LedgerSeq, txHash, now)
 	_, _ = s.db.Exec(`UPDATE codes SET status = 'redeemed', redeemed_at = ? WHERE campaign_id = ? AND code = ?`,
 		now, in.CampaignID, in.Code)
 	_, _ = s.db.Exec(`UPDATE campaigns SET burned = burned + 1 WHERE id = ?`, in.CampaignID)
-	if !s.charge(w, a, "redeem", in.Code+" · "+c.Name, mcrRedeem, "") {
-		return
-	}
-	s.logActivity(a, "redemption", in.Code, "redeemed · "+c.Name, "", &in.CampaignID, 0)
+	s.logActivity(a, "redemption", in.Code, "redeemed · "+c.Name, txHash, &in.CampaignID, 0)
 
 	// loyalty reward vouchers flip their status when redeemed
 	_, _ = s.db.Exec(`UPDATE rewards SET redeemed = 1 WHERE code = ? AND program_id IN
@@ -454,7 +595,7 @@ func (s *server) handleRedeem(w http.ResponseWriter, r *http.Request) {
 			"token_id": rec.TokenID, "code": rec.Code, "campaign_id": in.CampaignID,
 			"campaign_name": rec.CampaignName, "discount_type": rec.DiscountType,
 			"discount_value": rec.DiscountValue, "burned_at": rec.BurnedAt,
-			"ledger_seq": rec.LedgerSeq, "redeemer_ref": hex.EncodeToString(rec.RedeemerRef),
+			"ledger_seq": rec.LedgerSeq, "tx_hash": txHash, "redeemer_ref": hex.EncodeToString(rec.RedeemerRef),
 		},
 		"redeemer_nonce": nonce,
 	})
@@ -463,26 +604,33 @@ func (s *server) handleRedeem(w http.ResponseWriter, r *http.Request) {
 func (s *server) handleListRedemptions(w http.ResponseWriter, r *http.Request) {
 	a := authFrom(r)
 	q := `SELECT r.id, r.campaign_id, c.name, r.code, r.ok, COALESCE(r.error_code,0), COALESCE(r.error_name,''),
-	  COALESCE(r.redeemer_ref,''), COALESCE(r.token_id,0), COALESCE(r.ledger_seq,0), r.created_at
+	  COALESCE(r.redeemer_ref,''), COALESCE(r.token_id,0), COALESCE(r.ledger_seq,0), COALESCE(r.tx_hash,''), r.created_at
 	  FROM redemptions r JOIN campaigns c ON c.id = r.campaign_id
 	  WHERE r.org_id = ? AND r.env = ? ORDER BY r.id DESC LIMIT 200`
 	rows, err := s.db.Query(q, a.OrgID, a.Env)
 	if err != nil {
-		writeProblem(w, 500, err.Error())
+		writeInternal(w, err, "list redemptions")
 		return
 	}
 	defer rows.Close()
 	out := []map[string]any{}
 	for rows.Next() {
 		var id, cid, ecode, tokenID, seq, created int64
-		var name, code, ename, ref string
+		var name, code, ename, ref, txHash string
 		var ok int
-		_ = rows.Scan(&id, &cid, &name, &code, &ok, &ecode, &ename, &ref, &tokenID, &seq, &created)
+		if err := rows.Scan(&id, &cid, &name, &code, &ok, &ecode, &ename, &ref, &tokenID, &seq, &txHash, &created); err != nil {
+			writeInternal(w, err, "decode redemption")
+			return
+		}
 		out = append(out, map[string]any{
 			"id": id, "campaign_id": cid, "campaign_name": name, "code": code, "ok": ok == 1,
 			"error_code": ecode, "error_name": ename, "redeemer_ref": ref,
-			"token_id": tokenID, "ledger_seq": seq, "created_at": created,
+			"token_id": tokenID, "ledger_seq": seq, "tx_hash": txHash, "created_at": created,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		writeInternal(w, err, "read redemptions")
+		return
 	}
 	writeJSON(w, 200, map[string]any{"redemptions": out})
 }
