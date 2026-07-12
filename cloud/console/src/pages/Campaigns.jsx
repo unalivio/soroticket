@@ -3,10 +3,11 @@ import { api, decimalToBaseUnits, fmtDate, idemKey, trunc } from "../api.js";
 import { useApp } from "../store.jsx";
 import { BtnPrimary, ErrText, Ic, Pill } from "../ui.jsx";
 
-/* ── the five faces of the primitive ─────────────────────────────── */
+/* ── the six faces of the primitive ─────────────────────────────── */
 export const FACES = [
   { kind: "coupon", name: "General coupon", desc: "One shared code, redeemed by many — signed events are anchored by period.", example: "10OFF", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>) },
   { kind: "creator", name: "Creator / referral code", desc: "A shared code with an exact attributed period count and optional token payout.", example: "PEDROPROMO10", icon: Ic.users },
+  { kind: "gift", name: "Gift / delivery proof", desc: "Prove a gifted product reached real customers — one code per venue, scan per serving, optional payout per verified event.", example: "COPA-ROSALES", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><rect x="4" y="10" width="16" height="10" rx="1.6" /><path d="M4 14.2h16M12 10v10" /><path d="M12 10c-4.1 0-4.7-4.5-1.6-4.5C12.4 5.5 12 10 12 10zm0 0c4.1 0 4.7-4.5 1.6-4.5C11.6 5.5 12 10 12 10z" /></svg>) },
   { kind: "voucher", name: "Unique vouchers", desc: "Issued in batches; each code works exactly once, then it's gone.", example: "A7K9-QX2M", icon: Ic.coupon },
   { kind: "ticket", name: "Event tickets", desc: "Unique codes burned at the door — real-time single-use check-in.", example: "TICKET-0042", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><rect x="4" y="4" width="6" height="6" rx="1.2" /><rect x="14" y="4" width="6" height="6" rx="1.2" /><rect x="4" y="14" width="6" height="6" rx="1.2" /><path d="M14 14h2.6v2.6H14zM17.4 17.4H20V20h-2.6z" /></svg>) },
   { kind: "loyalty", name: "Loyalty program", desc: "Signed punches can be anchored by period; thresholds auto-issue a reward voucher.", example: "10 → 1 free", icon: (p) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="21" height="21" {...p}><rect x="3.5" y="6" width="17" height="12" rx="2.5" /><circle cx="8" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="16" cy="12" r="1" strokeDasharray="1.5 1.5" /></svg>) },
@@ -16,6 +17,7 @@ export const kindTag = (c) => {
   if (c.kind === "voucher") return "unique vouchers";
   if (c.kind === "ticket") return "event tickets";
   if (c.kind === "creator") return `creator code · ${trunc(c.attributed_to)}`;
+  if (c.kind === "gift") return c.attributed_to ? `gift proof · ${trunc(c.attributed_to)}` : "gift proof";
   if (c.kind === "loyalty") return "loyalty";
   return "shared code";
 };
@@ -64,7 +66,7 @@ export function CampaignsPage() {
       {data && list.length === 0 && !q
         ? <div className="empty">
             <h2 className="display" style={{ fontSize: 22, margin: 0 }}>No campaigns yet</h2>
-            <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: 0 }}>One primitive, five faces — coupons, creator codes, vouchers, tickets, punch cards.</p>
+            <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: 0 }}>One primitive, six faces — coupons, creator codes, gift proofs, vouchers, tickets, punch cards.</p>
             <BtnPrimary icon={<Ic.plus width={15} height={15} />} onClick={() => setWizard(true)}>Create your first campaign</BtnPrimary>
           </div>
         : <div className="card" style={{ overflow: "hidden" }}>
@@ -78,7 +80,7 @@ export function CampaignsPage() {
                 <div key={c.id} onClick={() => nav(`/campaigns/${c.id}`)}
                   style={{ display: "grid", gridTemplateColumns: "2.2fr 1fr 1.6fr .8fr .6fr 40px", gap: 14, padding: "13px 20px", borderBottom: "1px solid var(--line)", alignItems: "center", cursor: "pointer", opacity: dim ? 0.7 : 1 }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ fontSize: 14, fontWeight: 650 }}>{c.kind === "coupon" || c.kind === "creator" ? c.shared_code : c.name}</span>
+                    <span style={{ fontSize: 14, fontWeight: 650 }}>{c.kind === "coupon" || c.kind === "creator" || c.kind === "gift" ? c.shared_code : c.name}</span>
                     <span className="authtag" style={{ alignSelf: "flex-start" }}>{kindTag(c)}</span>
                   </div>
                   <Pill kind={pk || undefined}>{pl}</Pill>
@@ -119,9 +121,9 @@ export function Wizard({ onDone, fixedKind }) {
   });
   const face = FACES.find((x) => x.kind === kind);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const isShared = kind === "coupon" || kind === "creator";
+  const isShared = kind === "coupon" || kind === "creator" || kind === "gift";
 
-  const cost = kind === "creator" || kind === "loyalty" ? 30 : kind === "coupon" ? 30 : 20;
+  const cost = kind === "creator" || kind === "loyalty" ? 30 : kind === "coupon" || kind === "gift" ? 30 : 20;
 
   const create = async () => {
     setBusy(true); setErr(null);
@@ -144,18 +146,19 @@ export function Wizard({ onDone, fixedKind }) {
         toast("Program created", `${programName} · earn anchor ${r.program.earn_code} registered on-chain.`);
         onDone(null); nav("/loyalty"); return;
       }
-      const payoutRate = kind === "creator" && f.rate ? decimalToBaseUnits(f.rate, 7) : "0";
+      const attributes = kind === "creator" || (kind === "gift" && f.attributed_to.trim());
+      const payoutRate = attributes && f.rate ? decimalToBaseUnits(f.rate, 7) : "0";
       created = await api.postIdem("/v1/campaigns", {
         kind, name: f.name || (isShared ? f.code : "Campaign"),
         discount_type: f.discount_type, discount_value: Number(f.discount_value) || 0,
         total_supply: isShared ? 0 : Number(f.total_supply) || 100,
         valid_until: Math.floor(Date.now() / 1000) + (Number(f.months) || 12) * 30 * 86400,
         shared: isShared ? {
-          code: f.code, attributed_to: kind === "creator" ? f.attributed_to.trim() : "",
+          code: f.code, attributed_to: attributes ? f.attributed_to.trim() : "",
           payout_rate: payoutRate,
         } : undefined,
       }, idemKey());
-      toast("Campaign created", `${created.name} was created on the legacy testnet contract${isShared ? ` · ${created.shared_code} registered` : ""}.`);
+      toast("Campaign created", `${created.name} was created on the testnet contract${isShared ? ` · ${created.shared_code} registered` : ""}.`);
       onDone(created);
     } catch (e) { setErr(e); setBusy(false); }
   };
@@ -231,7 +234,7 @@ export function Wizard({ onDone, fixedKind }) {
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <h1 className="display" style={{ fontSize: 30, margin: 0 }}>{face.name}</h1>
-                  <span className="authtag">{isShared ? (kind === "creator" ? "shared · attributed" : "shared") : kind === "loyalty" ? "earn + reward" : "unique · single-use"}</span>
+                  <span className="authtag">{isShared ? (kind === "creator" ? "shared · attributed" : kind === "gift" ? "shared · delivery proof" : "shared") : kind === "loyalty" ? "earn + reward" : "unique · single-use"}</span>
                 </div>
                 <p style={{ fontSize: 14, color: "var(--ink-2)", margin: "6px 0 0" }}>{face.desc}</p>
               </div>
@@ -266,6 +269,30 @@ export function Wizard({ onDone, fixedKind }) {
                     <div style={{ background: "var(--pending-bg)", border: "1px solid color-mix(in oklch, var(--pending) 26%, transparent)", borderRadius: 12, padding: "13px 15px", display: "flex", gap: 11 }}>
                       <Ic.lock width={17} height={17} style={{ flex: "none", marginTop: 1, color: "var(--pending)" }} />
                       <p style={{ fontSize: 13, color: "var(--pending)", lineHeight: 1.5, margin: 0 }}><strong>Payout terms are immutable after creation.</strong> The creator can verify them on-chain before promoting the code — that's the point.</p>
+                    </div>
+                  </>}
+                  {kind === "gift" && <>
+                    <div className="field">
+                      <label>Venue's Stellar address <span style={{ color: "var(--ink-3)", fontWeight: 500 }}>(optional)</span></label>
+                      <input className="input mono" value={f.attributed_to} onChange={set("attributed_to")} placeholder="G…" />
+                      <span className="help">The delivery point that received the gift (a restaurant, a shop). Attributing it binds every verified scan to this address; add more venue codes to the campaign after creation.</span>
+                    </div>
+                    {f.attributed_to.trim() && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                        <div className="field">
+                          <label>Payout token</label>
+                          <select className="select mono" style={{ fontSize: 13.5 }}><option>XLM · testnet preview</option></select>
+                        </div>
+                        <div className="field">
+                          <label>Rate per verified serving</label>
+                          <input className="input mono" value={f.rate} onChange={set("rate")} />
+                          <span className="help">Optional incentive: the venue gets paid per verified scan at settlement. 0 disables payout.</span>
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ background: "var(--pending-bg)", border: "1px solid color-mix(in oklch, var(--pending) 26%, transparent)", borderRadius: 12, padding: "13px 15px", display: "flex", gap: 11 }}>
+                      <Ic.lock width={17} height={17} style={{ flex: "none", marginTop: 1, color: "var(--pending)" }} />
+                      <p style={{ fontSize: 13, color: "var(--pending)", lineHeight: 1.5, margin: 0 }}><strong>Scans prove attestation, not consumption.</strong> Signed receipts and the anchored tally make the scan set tamper-evident; detecting abuse (one phone scanning everything) is your integration's job — Sorodeal gives you the customer commitments to do it.</p>
                     </div>
                   </>}
                 </>}
@@ -331,7 +358,7 @@ export function Wizard({ onDone, fixedKind }) {
                 <div className="eyebrow" style={{ fontSize: 11, marginBottom: 12 }}>What this costs</div>
                 {[["Create campaign", "20 cr"],
                   ...(isShared ? [["Register shared code", "10 cr"], ["Recorded event", "0.2 cr"], ["Commit tally", "15 cr / period"]] : []),
-                  ...(kind === "creator" ? [["Settle period", "25 cr"]] : []),
+                  ...(kind === "creator" || kind === "gift" ? [["Settle period", "25 cr"]] : []),
                   ...(kind === "loyalty" ? [["Register earn anchor", "10 cr"], ["Punch", "0.2 cr"], ["Reward voucher", "2 cr"]] : []),
                   ...(!isShared && kind !== "loyalty" ? [["Issue unique code", "2 cr / code"], ["Redeem", "5 cr"]] : []),
                 ].map(([k, v], i) => (
@@ -366,6 +393,10 @@ export function Wizard({ onDone, fixedKind }) {
                     <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 8 }}><span style={{ color: "var(--ink-3)" }}>Creator</span><span className="mono" style={{ fontSize: 12 }}>{trunc(f.attributed_to)}</span></div>
                     <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 8 }}><span style={{ color: "var(--ink-3)" }}>Payout</span><span className="mono" style={{ fontSize: 12 }}>{f.rate} XLM / redemption</span></div>
                   </>}
+                  {kind === "gift" && f.attributed_to.trim() && <>
+                    <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 8 }}><span style={{ color: "var(--ink-3)" }}>Venue</span><span className="mono" style={{ fontSize: 12 }}>{trunc(f.attributed_to)}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 8 }}><span style={{ color: "var(--ink-3)" }}>Payout</span><span className="mono" style={{ fontSize: 12 }}>{Number(f.rate) > 0 ? `${f.rate} XLM / serving` : "none"}</span></div>
+                  </>}
                   <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 8 }}><span style={{ color: "var(--ink-3)" }}>Environment</span><span className="mono" style={{ fontSize: 12 }}>{env}</span></div>
                   <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 8 }}><span style={{ color: "var(--ink-3)" }}>Valid for</span><span>{f.months} months</span></div>
                 </div>
@@ -381,7 +412,7 @@ export function Wizard({ onDone, fixedKind }) {
                 {(isShared || kind === "loyalty") && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--ink-2)" }}>
                     <span className="mono" style={{ width: 20, height: 20, flex: "none", borderRadius: 999, background: "var(--surface-inset)", border: "1px solid var(--line)", display: "grid", placeItems: "center", fontSize: 10.5 }}>2</span>
-                    <span style={{ flex: 1 }}>{kind === "loyalty" ? "The earn code is registered — signed punches can be committed manually by period" : <><span className="mono" style={{ fontSize: 12 }}>{f.code}</span> is registered{kind === "creator" ? " with its payout terms — locked" : ""}</>}</span>
+                    <span style={{ flex: 1 }}>{kind === "loyalty" ? "The earn code is registered — signed punches can be committed manually by period" : <><span className="mono" style={{ fontSize: 12 }}>{f.code}</span> is registered{kind === "creator" ? " with its payout terms — locked" : kind === "gift" && f.attributed_to.trim() ? " — attributed to the venue" : ""}</>}</span>
                     <span className="mono" style={{ fontSize: 12 }}>{env === "test" ? "free" : "10 cr"}</span>
                   </div>
                 )}

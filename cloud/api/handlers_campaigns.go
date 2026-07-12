@@ -20,7 +20,7 @@ const (
 	maxReferenceLen = 512
 )
 
-var kindLabels = map[string]bool{"coupon": true, "creator": true, "voucher": true, "ticket": true}
+var kindLabels = map[string]bool{"coupon": true, "creator": true, "gift": true, "voucher": true, "ticket": true}
 
 type campaignOut struct {
 	ID            int64  `json:"id"`
@@ -65,7 +65,7 @@ func (s *server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !kindLabels[in.Kind] {
-		writeProblem(w, 400, "kind must be one of coupon|creator|voucher|ticket; create loyalty through /v1/loyalty/programs")
+		writeProblem(w, 400, "kind must be one of coupon|creator|gift|voucher|ticket; create loyalty through /v1/loyalty/programs")
 		return
 	}
 	in.Name = strings.TrimSpace(in.Name)
@@ -85,7 +85,7 @@ func (s *server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 400, "valid_until must be in the future")
 		return
 	}
-	isShared := in.Kind == "coupon" || in.Kind == "creator"
+	isShared := in.Kind == "coupon" || in.Kind == "creator" || in.Kind == "gift"
 	if in.TotalSupply == 0 {
 		if !isShared {
 			writeProblem(w, 400, "total_supply is required for voucher/ticket campaigns")
@@ -98,7 +98,7 @@ func (s *server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if isShared && (in.Shared == nil || strings.TrimSpace(in.Shared.Code) == "") {
-		writeProblem(w, 400, "shared.code is required for coupon/creator campaigns")
+		writeProblem(w, 400, "shared.code is required for coupon/creator/gift campaigns")
 		return
 	}
 
@@ -111,22 +111,34 @@ func (s *server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, 400, "shared.code exceeds 64 UTF-8 bytes")
 			return
 		}
-		if in.Kind == "creator" {
+		// creator binds attribution to the promoter (required); gift — the
+		// delivery/usage-proof profile — MAY attribute a delivery point (e.g.
+		// the venue that received the gifted product) and MAY pay it per
+		// verified event. Payout always requires an attribution target.
+		attributionRequired := in.Kind == "creator"
+		if attributionRequired || in.Kind == "gift" {
 			at := strings.TrimSpace(in.Shared.AttributedTo)
-			if !validStellarAddress(at) {
-				writeProblem(w, 400, "attributed_to must be a valid Stellar account or contract address")
-				return
-			}
-			sharedAttr = &at
-			if in.Shared.PayoutRate != "" && in.Shared.PayoutRate != "0" {
-				var ok bool
-				sharedRate, ok = new(big.Int).SetString(in.Shared.PayoutRate, 10)
-				if !ok || sharedRate.Sign() <= 0 || sharedRate.BitLen() > 127 {
-					writeProblem(w, 400, "payout_rate must be a positive i128 integer (token base-units)")
+			if at == "" && !attributionRequired {
+				if in.Shared.PayoutRate != "" && in.Shared.PayoutRate != "0" {
+					writeProblem(w, 400, "payout_rate requires attributed_to")
 					return
 				}
-				t := payoutToken
-				sharedToken = &t
+			} else {
+				if !validStellarAddress(at) {
+					writeProblem(w, 400, "attributed_to must be a valid Stellar account or contract address")
+					return
+				}
+				sharedAttr = &at
+				if in.Shared.PayoutRate != "" && in.Shared.PayoutRate != "0" {
+					var ok bool
+					sharedRate, ok = new(big.Int).SetString(in.Shared.PayoutRate, 10)
+					if !ok || sharedRate.Sign() <= 0 || sharedRate.BitLen() > 127 {
+						writeProblem(w, 400, "payout_rate must be a positive i128 integer (token base-units)")
+						return
+					}
+					t := payoutToken
+					sharedToken = &t
+				}
 			}
 		}
 	}
