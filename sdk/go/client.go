@@ -1,12 +1,12 @@
 // Package sorodeal is the Go SDK for the Sorodeal coupon protocol on Stellar
 // Soroban — the Burn profile (unique single-use codes) and the Tally profile
-// (shared codes + USDC-style settlement).
+// (shared codes + optional SAC token settlement).
 //
 // Unlike the prototype's `stellar` CLI shell-out, this client signs in-process
 // with the Go Stellar SDK and talks to Soroban RPC directly: it simulates,
 // assembles (footprint + resource fee + auth), signs, and submits with retries
 // and idempotent re-submission keyed on the transaction hash (so a network
-// retry can never double-burn). See CLAUDE.md production gaps #2 and #4.
+// retry cannot submit a different transaction for the same signed envelope.
 package sorodeal
 
 import (
@@ -30,8 +30,14 @@ const TestnetPassphrase = "Test SDF Network ; September 2015"
 // TestnetRPC is the public Soroban testnet RPC endpoint.
 const TestnetRPC = "https://soroban-testnet.stellar.org"
 
-// TestnetContractID is the live testnet deployment (see deployments/testnet.json).
-const TestnetContractID = "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX"
+// LegacyTestnetContractID is the immutable v0.1 testnet deployment. It is
+// retained only for compatibility and is deprecated by the 2026-07-11 security
+// review; do not use it for real-value integrations.
+const LegacyTestnetContractID = "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX"
+
+// TestnetContractID is a compatibility alias for LegacyTestnetContractID.
+// Deprecated: pass an explicitly reviewed deployment in Config.ContractID.
+const TestnetContractID = LegacyTestnetContractID
 
 // TestnetNativeSAC is the testnet native-XLM Stellar Asset Contract — a handy
 // settlement token for Tally payouts (see deployments/testnet.json).
@@ -58,6 +64,7 @@ type Client struct {
 	cfg        Config
 	rpc        *rpcclient.Client
 	contractID xdr.ContractId
+	lastTxHash string
 }
 
 // New builds a Client. Missing network fields default to testnet.
@@ -71,12 +78,10 @@ func New(cfg Config) (*Client, error) {
 	if cfg.NetworkPassphrase == "" {
 		cfg.NetworkPassphrase = TestnetPassphrase
 	}
-	decoded, err := strkey.Decode(strkey.VersionByteContract, cfg.ContractID)
+	cid, err := parseContractID(cfg.ContractID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid contract id %q: %w", cfg.ContractID, err)
 	}
-	var cid xdr.ContractId
-	copy(cid[:], decoded)
 	return &Client{
 		cfg:        cfg,
 		rpc:        rpcclient.NewClient(cfg.RPCURL, nil),
@@ -97,16 +102,40 @@ func (c *Client) Address() string {
 	return c.cfg.Signer.Address()
 }
 
+// LastTransactionHash returns the hash of the most recent successful write
+// performed by this client, or an empty string if the last write failed or no
+// write has run. Client writes are intentionally sequential; see Client docs.
+func (c *Client) LastTransactionHash() string { return c.lastTxHash }
+
 // Close releases the underlying RPC client.
 func (c *Client) Close() error { return c.rpc.Close() }
 
+// LatestLedger returns the most recent ledger sequence reported by RPC.
+func (c *Client) LatestLedger(ctx context.Context) (uint32, error) {
+	ledger, err := c.rpc.GetLatestLedger(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return ledger.Sequence, nil
+}
+
+func parseContractID(address string) (xdr.ContractId, error) {
+	decoded, err := strkey.Decode(strkey.VersionByteContract, address)
+	if err != nil {
+		return xdr.ContractId{}, err
+	}
+	var id xdr.ContractId
+	copy(id[:], decoded)
+	return id, nil
+}
+
 // hostOp builds the InvokeHostFunction operation for a contract call.
-func (c *Client) hostOp(method string, args []xdr.ScVal, source string) *txnbuild.InvokeHostFunction {
+func (c *Client) hostOpAt(contractID xdr.ContractId, method string, args []xdr.ScVal, source string) *txnbuild.InvokeHostFunction {
 	return &txnbuild.InvokeHostFunction{
 		HostFunction: xdr.HostFunction{
 			Type: xdr.HostFunctionTypeHostFunctionTypeInvokeContract,
 			InvokeContract: &xdr.InvokeContractArgs{
-				ContractAddress: xdr.ScAddress{Type: xdr.ScAddressTypeScAddressTypeContract, ContractId: &c.contractID},
+				ContractAddress: xdr.ScAddress{Type: xdr.ScAddressTypeScAddressTypeContract, ContractId: &contractID},
 				FunctionName:    xdr.ScSymbol(method),
 				Args:            args,
 			},
@@ -128,6 +157,10 @@ func (c *Client) buildTx(source string, seq int64, op *txnbuild.InvokeHostFuncti
 // read simulates a contract call and returns the decoded return ScVal. No
 // signature, no submission. Surfaces contract traps as *ContractError.
 func (c *Client) read(ctx context.Context, method string, args []xdr.ScVal) (xdr.ScVal, error) {
+	return c.readAt(ctx, c.contractID, method, args)
+}
+
+func (c *Client) readAt(ctx context.Context, contractID xdr.ContractId, method string, args []xdr.ScVal) (xdr.ScVal, error) {
 	source := c.cfg.ReadSource
 	if source == "" {
 		if c.cfg.Signer != nil {
@@ -136,7 +169,7 @@ func (c *Client) read(ctx context.Context, method string, args []xdr.ScVal) (xdr
 			source = defaultReadSource
 		}
 	}
-	tx, err := c.buildTx(source, 0, c.hostOp(method, args, source))
+	tx, err := c.buildTx(source, 0, c.hostOpAt(contractID, method, args, source))
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
@@ -158,6 +191,11 @@ func (c *Client) read(ctx context.Context, method string, args []xdr.ScVal) (xdr
 // returning the contract's actual return value (read from the applied tx meta,
 // not from simulation — the global counters can advance between the two).
 func (c *Client) invoke(ctx context.Context, method string, args []xdr.ScVal) (xdr.ScVal, error) {
+	return c.invokeAt(ctx, c.contractID, method, args)
+}
+
+func (c *Client) invokeAt(ctx context.Context, contractID xdr.ContractId, method string, args []xdr.ScVal) (xdr.ScVal, error) {
+	c.lastTxHash = ""
 	if c.cfg.Signer == nil {
 		return xdr.ScVal{}, errors.New("a signer is required for writes")
 	}
@@ -174,7 +212,7 @@ func (c *Client) invoke(ctx context.Context, method string, args []xdr.ScVal) (x
 
 	// 1) Simulate to obtain footprint, resource fee, and auth entries. Most
 	//    contract errors (Unauthorized, AlreadyRedeemed, …) surface here.
-	simTx, err := c.buildTx(pub, seq, c.hostOp(method, args, pub))
+	simTx, err := c.buildTx(pub, seq, c.hostOpAt(contractID, method, args, pub))
 	if err != nil {
 		return xdr.ScVal{}, err
 	}
@@ -206,7 +244,7 @@ func (c *Client) invoke(ctx context.Context, method string, args []xdr.ScVal) (x
 		}
 	}
 
-	op := c.hostOp(method, args, pub)
+	op := c.hostOpAt(contractID, method, args, pub)
 	op.Auth = auth
 	op.Ext = xdr.TransactionExt{V: 1, SorobanData: &sorobanData}
 
@@ -259,7 +297,12 @@ func (c *Client) submitAndPoll(ctx context.Context, env, hash, method string) (x
 			}
 			switch strings.ToUpper(got.Status) {
 			case protocol.TransactionStatusSuccess:
-				return returnValueFromMeta(got.ResultMetaXDR)
+				value, err := returnValueFromMeta(got.ResultMetaXDR)
+				if err != nil {
+					return xdr.ScVal{}, err
+				}
+				c.lastTxHash = hash
+				return value, nil
 			case protocol.TransactionStatusFailed:
 				return xdr.ScVal{}, classifyFailure(got.ResultXDR, got.DiagnosticEventsXDR,
 					fmt.Sprintf("tx %s failed", hash))

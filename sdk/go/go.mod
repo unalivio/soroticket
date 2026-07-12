@@ -1,6 +1,6 @@
 module github.com/sorodeal/sorodeal-go
 
-go 1.25.3
+go 1.25.12
 
 require github.com/stellar/go-stellar-sdk v0.6.0
 

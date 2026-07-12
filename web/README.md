@@ -1,6 +1,11 @@
 # Sorodeal Playground (web)
 
-Interactive developer playground for the Sorodeal coupon protocol — **live on Stellar testnet**, signing with **Freighter**. Create campaigns, issue codes, redeem, verify, manage delegates, and copy ready-to-run CLI / TypeScript / Go snippets for every call.
+Interactive developer playground for the Sorodeal coupon protocol, signing with
+Freighter on Stellar testnet.
+
+> It currently calls the real but **deprecated v0.1** deployment. Candidate
+> v0.2 is built/tested locally and is not deployed. Do not treat this playground
+> as a production or real-value environment.
 
 ## Run
 
@@ -27,9 +32,16 @@ npm run preview
 
 ## How it works
 
-- **Real contract.** Every write builds a Soroban transaction, simulates it, is signed by Freighter, and is submitted to the live testnet contract. Reads run as RPC simulations (no signature). Contract: `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX` (see `../deployments/testnet.json`).
+- **Real legacy contract.** Every write builds, simulates, signs and submits a
+  testnet transaction. Contract v0.1:
+  `CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX`; see its known
+  issues in `../deployments/testnet.json`.
 - **No PII on-chain.** The redeemer reference is committed in-browser as an opaque, non-reversible 32-byte `redeemer_ref_hash` = SHA-256(random nonce ∥ reference). A public/constant salt would be brute-forceable for low-entropy refs; the random nonce makes it non-reversible and unlinkable (production may HMAC with a merchant pepper). ADR-005/010.
-- **Chain is the source of truth.** On connect, the app loads your campaigns from the chain via `campaigns_of(owner)` — no localStorage. The seeded *Demo Cafe* (campaign `1`, codes `DEMO0001`/`DEMO0002`) backs the no-wallet Verify demo. Codes are scoped per campaign (ADR-009), so verify/redeem take a campaign id.
+- **No fake UI state.** On connect, the app loads campaigns from the chain via
+  `campaigns_of(owner)`; there are no local/demo campaigns or generated Merkle
+  roots in memory. The legacy chain itself contains a real seeded *Demo Cafe*
+  campaign. Its `ROBERTOX` tally (40 total / 30 attributed) is evidence of the
+  v0.1 flaw and would be rejected by v0.2.
 
 ### Try it
 1. **Verify** `DEMO0001` — works immediately, no wallet (public read against the live contract).

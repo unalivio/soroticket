@@ -9,12 +9,15 @@ import { basicNodeSigner, type ClientOptions } from "@stellar/stellar-sdk/contra
 import { Buffer } from "buffer";
 import { Client } from "./contract.js";
 
-/** Live testnet deployment (see deployments/testnet.json). */
-export const TESTNET = {
+/** Deprecated immutable v0.1 testnet deployment. Never use for real value. */
+export const LEGACY_TESTNET = {
   contractId: "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX",
   networkPassphrase: "Test SDF Network ; September 2015",
   rpcUrl: "https://soroban-testnet.stellar.org",
 } as const;
+
+/** @deprecated Pass an explicitly reviewed deployment; this alias is v0.1. */
+export const TESTNET = LEGACY_TESTNET;
 
 export type SorodealOptions = Partial<ClientOptions>;
 
@@ -62,7 +65,10 @@ export async function redeemerCommitment(
   ref: string,
   nonceHex?: string,
 ): Promise<{ nonce: string; hash: Buffer }> {
-  const nonce = nonceHex ?? randomNonceHex();
+  if (nonceHex !== undefined && !/^[0-9a-fA-F]{32}$/.test(nonceHex)) {
+    throw new RangeError("nonceHex must contain exactly 16 bytes (32 hex characters)");
+  }
+  const nonce = nonceHex?.toLowerCase() ?? randomNonceHex();
   const data = new TextEncoder().encode(nonce + "|" + ref);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return { nonce, hash: Buffer.from(new Uint8Array(digest)) };

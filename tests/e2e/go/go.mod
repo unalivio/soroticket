@@ -1,6 +1,6 @@
 module sorodeal-e2e
 
-go 1.25.3
+go 1.25.12
 
 require (
 	github.com/sorodeal/sorodeal-go v0.0.0

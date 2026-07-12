@@ -47,6 +47,9 @@ export interface FreighterClientConfig {
   horizonUrl?: string;
 }
 
+export type U64Input = number | bigint | string;
+export type U32Input = number | bigint | string;
+
 /**
  * Extract a contract error code from a host-error string/message. Contract
  * errors surface at simulation as a string containing `Error(Contract, #N)`.
@@ -69,20 +72,50 @@ export function freighterClient(cfg: FreighterClientConfig) {
   const horizonUrl = cfg.horizonUrl ?? "https://horizon-testnet.stellar.org";
   const server = () => new rpc.Server(cfg.rpcUrl);
 
+  const U32_MAX = 0xffff_ffffn;
+  const U64_MAX = (1n << 64n) - 1n;
+  const I128_MIN = -(1n << 127n);
+  const I128_MAX = (1n << 127n) - 1n;
+
+  function integer(value: unknown, label: string): bigint {
+    const raw = String(value ?? "").trim();
+    if (!/^-?\d+$/.test(raw)) throw new RangeError(`${label} must be an integer`);
+    return BigInt(raw);
+  }
+
+  function safeNumber(value: unknown, label: string): number {
+    const n = integer(value, label);
+    if (n < BigInt(Number.MIN_SAFE_INTEGER) || n > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new RangeError(`${label} exceeds JavaScript's safe integer range; use the generated typed client to retain bigint precision`);
+    }
+    return Number(n);
+  }
+
   /* ── ScVal encoders (match contracts/coupon-ledger/src/lib.rs types) ── */
   const scAddr = (a: string) => nativeToScVal(a, { type: "address" });
   const scStr = (s: unknown) => nativeToScVal(String(s), { type: "string" });
-  const scU64 = (n: number | bigint | string) => nativeToScVal(BigInt(n as any), { type: "u64" });
-  const scU32 = (n: number | string) => nativeToScVal(Number(n), { type: "u32" });
+  const scU64 = (n: U64Input) => {
+    const value = integer(n, "u64");
+    if (value < 0n || value > U64_MAX) throw new RangeError("u64 is out of range");
+    return nativeToScVal(value, { type: "u64" });
+  };
+  const scU32 = (n: U32Input) => {
+    const value = integer(n, "u32");
+    if (value < 0n || value > U32_MAX) throw new RangeError("u32 is out of range");
+    return nativeToScVal(Number(value), { type: "u32" });
+  };
   const scVecStr = (arr: string[]) => xdr.ScVal.scvVec((arr || []).map((c) => scStr(c)));
   const scBytes32 = (hex: string) => nativeToScVal(hexToBytes(hex), { type: "bytes" }); // BytesN<32>
   // i128 from a decimal string/BigInt — exact, never via Number (avoids precision loss)
-  const scI128 = (n: unknown) =>
-    nativeToScVal(BigInt(String(n ?? "0").trim().split(".")[0] || "0"), { type: "i128" });
-  const scVecU64 = (arr: (number | bigint | string)[]) =>
+  const scI128 = (n: unknown) => {
+    const value = integer(n, "i128");
+    if (value < I128_MIN || value > I128_MAX) throw new RangeError("i128 is out of range");
+    return nativeToScVal(value, { type: "i128" });
+  };
+  const scVecU64 = (arr: U64Input[]) =>
     xdr.ScVal.scvVec((arr || []).map((n) => scU64(n)));
   const scOptAddr = (a?: string | null) => (a ? scAddr(a) : xdr.ScVal.scvVoid()); // Option<Address>
-  const scMapAddrU32 = (pairs: [string, number | string][]) =>
+  const scMapAddrU32 = (pairs: [string, U32Input][]) =>
     xdr.ScVal.scvMap(
       (pairs || []).map(([addr, n]) => new xdr.ScMapEntry({ key: scAddr(addr), val: scU32(n) })),
     );
@@ -112,10 +145,10 @@ export function freighterClient(cfg: FreighterClientConfig) {
   }
 
   /* ── read-only call (simulate, no signature) ──────────────────── */
-  async function read(method: string, args: any[]) {
+  async function readAt(contractId: string, method: string, args: any[]) {
     const srv = server();
     const source = new Account(cfg.readSource, "0");
-    const contract = new Contract(cfg.contractId);
+    const contract = new Contract(contractId);
     const tx = new TransactionBuilder(source, { fee: BASE_FEE, networkPassphrase: cfg.networkPassphrase })
       .addOperation(contract.call(method, ...args))
       .setTimeout(60)
@@ -125,12 +158,16 @@ export function freighterClient(cfg: FreighterClientConfig) {
     return sim.result ? sim.result.retval : null;
   }
 
+  async function read(method: string, args: any[]) {
+    return readAt(cfg.contractId, method, args);
+  }
+
   /* ── write call (simulate → assemble → Freighter sign → send → poll) ── */
-  async function write(from: string, method: string, args: any[]) {
+  async function writeAt(from: string, contractId: string, method: string, args: any[]) {
     const Freighter = await loadFreighter();
     const srv = server();
     const source = await srv.getAccount(from);
-    const contract = new Contract(cfg.contractId);
+    const contract = new Contract(contractId);
     const built = new TransactionBuilder(source, { fee: BASE_FEE, networkPassphrase: cfg.networkPassphrase })
       .addOperation(contract.call(method, ...args))
       .setTimeout(60)
@@ -162,6 +199,10 @@ export function freighterClient(cfg: FreighterClientConfig) {
       throw contractErr(detail);
     }
     return { retval: got.returnValue, tx: sent.hash, seq: got.ledger };
+  }
+
+  async function write(from: string, method: string, args: any[]) {
+    return writeAt(from, cfg.contractId, method, args);
   }
 
   /* ── wallet (Freighter) ───────────────────────────────────────── */
@@ -218,35 +259,39 @@ export function freighterClient(cfg: FreighterClientConfig) {
   /* ── enumerate an owner's campaigns from the chain (the source of truth) ── */
   async function campaignsOf(owner: string) {
     const ids = toNative(await read("campaigns_of", [scAddr(owner)]));
-    return (ids || []).map(Number);
+    return (ids || []).map((id: unknown) => safeNumber(id, "campaign id"));
   }
-  async function getCampaign(id: number | bigint) {
+  async function campaignsPage(owner: string, cursor: U64Input, limit: U32Input = 100) {
+    const ids = toNative(await read("campaigns_page", [scAddr(owner), scU64(cursor), scU32(limit)]));
+    return (ids || []).map((id: unknown) => safeNumber(id, "campaign id"));
+  }
+  async function getCampaign(id: U64Input) {
     const c = toNative(await read("get_campaign", [scU64(id)]));
     return {
-      id: Number(c.id), owner: c.owner, name: c.name,
-      discount_type: c.discount_type, discount_value: Number(c.discount_value),
+      id: safeNumber(c.id, "campaign id"), owner: c.owner, name: c.name,
+      discount_type: c.discount_type, discount_value: safeNumber(c.discount_value, "discount value"),
       total_supply: Number(c.total_supply), minted: Number(c.minted),
-      burned: Number(c.burned), valid_until: Number(c.valid_until),
+      burned: Number(c.burned), valid_until: safeNumber(c.valid_until, "valid_until"),
     };
   }
 
   /* ── Tally profile (shared codes) — ADR-003/004/011 ── */
   async function registerShared(
-    from: string, campaignId: number, code: string,
+    from: string, campaignId: U64Input, code: string,
     attributedTo?: string | null, payoutToken?: string | null, payoutRate?: unknown,
   ) {
     // payout token + rate are fixed at registration (immutable) — settle uses them
     return await write(from, "register_shared", [
       scAddr(from), scU64(campaignId), scStr(code),
-      scOptAddr(attributedTo), scOptAddr(payoutToken), scI128(payoutRate),
+      scOptAddr(attributedTo), scOptAddr(payoutToken), scI128(payoutRate ?? 0),
     ]);
   }
-  async function getShared(campaignId: number, code: string) {
+  async function getShared(campaignId: U64Input, code: string) {
     return toNative(await read("get_shared", [scU64(campaignId), scStr(code)]));
   }
   async function commitTally(
-    from: string, campaignId: number, code: string, period: number,
-    count: number, merkleHex: string, perAttribution: [string, number | string][],
+    from: string, campaignId: U64Input, code: string, period: U64Input,
+    count: U32Input, merkleHex: string, perAttribution: [string, U32Input][],
   ) {
     // perAttribution: array of [address, count]
     return await write(from, "commit_tally", [
@@ -254,26 +299,46 @@ export function freighterClient(cfg: FreighterClientConfig) {
       scBytes32(merkleHex), scMapAddrU32(perAttribution),
     ]);
   }
-  async function getTally(campaignId: number, code: string, period: number) {
+  async function getTally(campaignId: U64Input, code: string, period: U64Input) {
     return toNative(await read("get_tally", [scU64(campaignId), scStr(code), scU64(period)]));
   }
-  async function computePayouts(campaignId: number, code: string, period: number) {
+  async function isSettled(campaignId: U64Input, code: string, period: U64Input) {
+    return Boolean(toNative(await read("is_settled", [scU64(campaignId), scStr(code), scU64(period)])));
+  }
+  async function computePayouts(campaignId: U64Input, code: string, period: U64Input) {
     // rate comes from the registered shared code (no arbitrary rate)
     return toNative(await read("compute_payouts", [scU64(campaignId), scStr(code), scU64(period)]));
   }
-  async function settle(from: string, campaignId: number, code: string, period: number) {
+  async function settleFor(from: string, owner: string, campaignId: U64Input, code: string, period: U64Input) {
     // token + rate are read from the shared code on-chain (immutable)
-    return await write(from, "settle", [scAddr(from), scU64(campaignId), scStr(code), scU64(period)]);
+    return await write(from, "settle", [scAddr(owner), scU64(campaignId), scStr(code), scU64(period)]);
   }
-  async function bumpTally(from: string, campaignId: number, code: string, periods: number[]) {
+  async function settle(from: string, campaignId: U64Input, code: string, period: U64Input) {
+    return settleFor(from, from, campaignId, code, period);
+  }
+  async function approveSettlement(from: string, payoutToken: string, amount: unknown, expirationLedger: U32Input) {
+    return writeAt(from, payoutToken, "approve", [
+      scAddr(from), scAddr(cfg.contractId), scI128(amount), scU32(expirationLedger),
+    ]);
+  }
+  async function settlementAllowance(payoutToken: string, owner: string) {
+    return toNative(await readAt(payoutToken, "allowance", [scAddr(owner), scAddr(cfg.contractId)]));
+  }
+  async function bumpTally(from: string, campaignId: U64Input, code: string, periods: U64Input[]) {
     // public maintenance: re-extend a shared code + its periods' storage TTL (from = fee payer)
     return await write(from, "bump_tally", [scU64(campaignId), scStr(code), scVecU64(periods)]);
   }
+  async function bumpDelegates(from: string, campaignId: U64Input, delegates: string[]) {
+    return write(from, "bump_delegates", [
+      scU64(campaignId), xdr.ScVal.scvVec((delegates || []).map((delegate) => scAddr(delegate))),
+    ]);
+  }
 
   return {
-    read, write, connectWallet, getBalance, toNative, bytesToHex,
-    campaignsOf, getCampaign,
-    registerShared, getShared, commitTally, getTally, computePayouts, settle, bumpTally,
+    read, readAt, write, writeAt, connectWallet, getBalance, toNative, bytesToHex,
+    campaignsOf, campaignsPage, getCampaign,
+    registerShared, getShared, commitTally, getTally, isSettled, computePayouts,
+    settle, settleFor, approveSettlement, settlementAllowance, bumpTally, bumpDelegates,
     scAddr, scStr, scU64, scU32, scVecStr, scBytes32, scI128,
   };
 }

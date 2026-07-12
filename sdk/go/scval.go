@@ -57,16 +57,22 @@ func scMap(entries []xdr.ScMapEntry) xdr.ScVal {
 
 var (
 	two128  = new(big.Int).Lsh(big.NewInt(1), 128)
+	minI128 = new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 127))
+	maxI128 = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
 	maskU64 = new(big.Int).SetUint64(^uint64(0))
 )
 
 // scI128 encodes a (possibly negative) big.Int as a 128-bit two's-complement ScVal.
-func scI128(v *big.Int) xdr.ScVal {
+// Values outside the ABI range are rejected instead of silently wrapping.
+func scI128(v *big.Int) (xdr.ScVal, error) {
+	if v == nil || v.Cmp(minI128) < 0 || v.Cmp(maxI128) > 0 {
+		return xdr.ScVal{}, fmt.Errorf("i128 value out of range")
+	}
 	n := new(big.Int).Mod(v, two128) // Euclidean mod ⇒ two's complement for negatives
 	lo := new(big.Int).And(n, maskU64).Uint64()
 	hi := new(big.Int).Rsh(n, 64).Uint64()
 	p := xdr.Int128Parts{Hi: xdr.Int64(int64(hi)), Lo: xdr.Uint64(lo)}
-	return xdr.ScVal{Type: xdr.ScValTypeScvI128, I128: &p}
+	return xdr.ScVal{Type: xdr.ScValTypeScvI128, I128: &p}, nil
 }
 
 // scAddress encodes a Stellar account ("G…") or contract ("C…") address.

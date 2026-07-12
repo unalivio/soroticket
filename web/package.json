@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Developer playground for the Sorodeal coupon protocol — live on Stellar testnet, signing with Freighter.",
+  "description": "Developer playground for Sorodeal using the deprecated v0.1 testnet deployment.",
   "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
@@ -16,12 +16,12 @@
   "dependencies": {
     "@sorodeal/sdk": "file:../sdk/ts",
     "@stellar/freighter-api": "^4.1.0",
-    "@stellar/stellar-sdk": "^15.0.0",
+    "@stellar/stellar-sdk": "^16.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.7"
+    "vite": "^6.4.3"
   }
 }

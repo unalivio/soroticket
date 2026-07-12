@@ -43,10 +43,10 @@ function toFriendly(raw) {
 function AppProvider({ children }) {
   const [wallet, setWallet] = useState(null);          // { address, balance }
   const [connecting, setConnecting] = useState(false);
-  const seedRef = useRef(null);
-  if (!seedRef.current) seedRef.current = SD.seedState();
-  const [state, setState] = useState(seedRef.current);
-  const stateRef = useRef(seedRef.current);            // always-fresh mirror for sync reads
+  const initialRef = useRef(null);
+  if (!initialRef.current) initialRef.current = SD.initialState();
+  const [state, setState] = useState(initialRef.current);
+  const stateRef = useRef(initialRef.current);          // always-fresh mirror for sync reads
   const [log, setLog] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [highlight, setHighlight] = useState(null);
@@ -57,7 +57,7 @@ function AppProvider({ children }) {
 
   /* ── toasts ───────────────────────────────────────────────── */
   const toast = useCallback((t) => {
-    const id = Math.random().toString(36).slice(2);
+    const id = crypto.randomUUID();
     setToasts((ts) => [...ts, { id, ...t }]);
     setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== id)), t.duration || 4600);
   }, []);
@@ -65,13 +65,13 @@ function AppProvider({ children }) {
 
   /* ── activity log ─────────────────────────────────────────── */
   const pushLog = useCallback((entry) => {
-    setLog((l) => [{ id: Math.random().toString(36).slice(2), at: Date.now(), ...entry }, ...l].slice(0, 60));
+    setLog((l) => [{ id: crypto.randomUUID(), at: Date.now(), ...entry }, ...l].slice(0, 60));
   }, []);
   const clearLog = () => setLog([]);
 
   /* run a real invocation: log pending → ok/err; returns {result, tx, seq} */
   const invoke = useCallback(async (method, auth, args, fn, { read = false } = {}) => {
-    const logId = Math.random().toString(36).slice(2);
+    const logId = crypto.randomUUID();
     setLog((l) => [{ id: logId, at: Date.now(), method, auth, args, status: "pending", read, tx: null }, ...l].slice(0, 60));
     try {
       const out = await fn();                          // { result, tx?, seq? }

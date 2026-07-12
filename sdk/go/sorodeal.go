@@ -154,6 +154,31 @@ func (c *Client) CampaignsOf(ctx context.Context, owner string) ([]uint64, error
 	return out, nil
 }
 
+// CampaignsPage returns a bounded page of an owner's campaign ids. Cursor is a
+// zero-based slot; limit must be between 1 and 100 on contract v0.2+.
+func (c *Client) CampaignsPage(ctx context.Context, owner string, cursor uint64, limit uint32) ([]uint64, error) {
+	addr, err := scAddress(owner)
+	if err != nil {
+		return nil, err
+	}
+	v, err := c.read(ctx, "campaigns_page", []xdr.ScVal{addr, scU64(cursor), scU32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	n, err := native(v)
+	if err != nil {
+		return nil, err
+	}
+	items, _ := n.([]interface{})
+	out := make([]uint64, 0, len(items))
+	for _, item := range items {
+		if id, ok := item.(uint64); ok {
+			out = append(out, id)
+		}
+	}
+	return out, nil
+}
+
 // CampaignStats reads campaign statistics (public).
 func (c *Client) CampaignStats(ctx context.Context, id uint64) (CampaignStats, error) {
 	v, err := c.read(ctx, "campaign_stats", []xdr.ScVal{scU64(id)})
@@ -182,6 +207,21 @@ func (c *Client) BumpCampaign(ctx context.Context, id uint64) error {
 // BumpCodes re-extends specific coupons' storage TTL (public). Unknown codes are skipped.
 func (c *Client) BumpCodes(ctx context.Context, id uint64, codes []string) error {
 	_, err := c.invoke(ctx, "bump_codes", []xdr.ScVal{scU64(id), strVec(codes)})
+	return err
+}
+
+// BumpDelegates re-extends specific delegate authorizations (public). Unknown
+// addresses are skipped by the contract.
+func (c *Client) BumpDelegates(ctx context.Context, id uint64, delegates []string) error {
+	items := make([]xdr.ScVal, 0, len(delegates))
+	for _, delegate := range delegates {
+		addr, err := scAddress(delegate)
+		if err != nil {
+			return err
+		}
+		items = append(items, addr)
+	}
+	_, err := c.invoke(ctx, "bump_delegates", []xdr.ScVal{scU64(id), scVec(items)})
 	return err
 }
 
@@ -372,7 +412,11 @@ func (c *Client) RegisterShared(ctx context.Context, id uint64, code string, att
 	if payoutRate == nil {
 		payoutRate = big.NewInt(0)
 	}
-	_, err = c.invoke(ctx, "register_shared", []xdr.ScVal{owner, scU64(id), scString(code), attr, tok, scI128(payoutRate)})
+	rate, err := scI128(payoutRate)
+	if err != nil {
+		return err
+	}
+	_, err = c.invoke(ctx, "register_shared", []xdr.ScVal{owner, scU64(id), scString(code), attr, tok, rate})
 	return err
 }
 
@@ -430,6 +474,20 @@ func (c *Client) GetTally(ctx context.Context, id uint64, code string, period ui
 	}, nil
 }
 
+// IsSettled reports whether a tally period has already been paid (public).
+func (c *Client) IsSettled(ctx context.Context, id uint64, code string, period uint64) (bool, error) {
+	v, err := c.read(ctx, "is_settled", []xdr.ScVal{scU64(id), scString(code), scU64(period)})
+	if err != nil {
+		return false, err
+	}
+	n, err := native(v)
+	if err != nil {
+		return false, err
+	}
+	b, _ := n.(bool)
+	return b, nil
+}
+
 // ComputePayouts previews payouts for a committed tally (public, no transfer).
 func (c *Client) ComputePayouts(ctx context.Context, id uint64, code string, period uint64) ([]Payout, error) {
 	v, err := c.read(ctx, "compute_payouts", []xdr.ScVal{scU64(id), scString(code), scU64(period)})
@@ -439,9 +497,18 @@ func (c *Client) ComputePayouts(ctx context.Context, id uint64, code string, per
 	return payoutsFromScVal(v)
 }
 
-// Settle pays each attributed address from the signer's balance (owner only).
+// Settle pays each attributed address from the signer's balance. The signer is
+// used as both campaign owner and fee payer. On contract v0.2+, settlement
+// consumes the allowance previously granted to the Sorodeal contract.
 func (c *Client) Settle(ctx context.Context, id uint64, code string, period uint64) ([]Payout, error) {
-	owner, err := scAddress(c.Address())
+	return c.SettleFor(ctx, c.Address(), id, code, period)
+}
+
+// SettleFor triggers a campaign owner's settlement while the client's signer
+// only pays the transaction fee. This enables permissionless keepers on
+// contract v0.2+; the owner must first call ApproveSettlement.
+func (c *Client) SettleFor(ctx context.Context, ownerAddress string, id uint64, code string, period uint64) ([]Payout, error) {
+	owner, err := scAddress(ownerAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -450,6 +517,61 @@ func (c *Client) Settle(ctx context.Context, id uint64, code string, period uint
 		return nil, err
 	}
 	return payoutsFromScVal(v)
+}
+
+// ApproveSettlement grants the Sorodeal contract an allowance on payoutToken,
+// enabling permissionless settlements up to amount until expirationLedger.
+func (c *Client) ApproveSettlement(ctx context.Context, payoutToken string, amount *big.Int, expirationLedger uint32) error {
+	from, err := scAddress(c.Address())
+	if err != nil {
+		return err
+	}
+	spender, err := scAddress(c.cfg.ContractID)
+	if err != nil {
+		return err
+	}
+	encodedAmount, err := scI128(amount)
+	if err != nil {
+		return err
+	}
+	tokenID, err := parseContractID(payoutToken)
+	if err != nil {
+		return fmt.Errorf("invalid payout token contract %q: %w", payoutToken, err)
+	}
+	_, err = c.invokeAt(ctx, tokenID, "approve", []xdr.ScVal{
+		from, spender, encodedAmount, scU32(expirationLedger),
+	})
+	return err
+}
+
+// SettlementAllowance returns the owner's token allowance granted to the
+// Sorodeal contract.
+func (c *Client) SettlementAllowance(ctx context.Context, payoutToken, ownerAddress string) (*big.Int, error) {
+	owner, err := scAddress(ownerAddress)
+	if err != nil {
+		return nil, err
+	}
+	spender, err := scAddress(c.cfg.ContractID)
+	if err != nil {
+		return nil, err
+	}
+	tokenID, err := parseContractID(payoutToken)
+	if err != nil {
+		return nil, fmt.Errorf("invalid payout token contract %q: %w", payoutToken, err)
+	}
+	v, err := c.readAt(ctx, tokenID, "allowance", []xdr.ScVal{owner, spender})
+	if err != nil {
+		return nil, err
+	}
+	n, err := native(v)
+	if err != nil {
+		return nil, err
+	}
+	amount, ok := n.(*big.Int)
+	if !ok {
+		return nil, fmt.Errorf("expected i128 allowance, got %T", n)
+	}
+	return amount, nil
 }
 
 // BumpTally re-extends a shared code and the given periods' storage TTL (public).

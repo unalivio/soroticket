@@ -97,11 +97,11 @@ function Toasts() {
 /* ── Benefits band ──────────────────────────────────────────── */
 const BENEFITS = [
   { ic: Ic.lock, h: "Single-use, enforced on-chain", p: "The Burn profile guarantees each unique code can be redeemed exactly once. Double-spend is rejected by the contract itself — not your backend." },
-  { ic: Ic.shield, h: "PII-free by design", p: "Redeemer identity is committed as an opaque 32-byte value computed with a random nonce. No personal data is written on-chain." },
+  { ic: Ic.shield, h: "No plaintext PII on-chain", p: "Redeemer identity can be committed as an opaque 32-byte value computed with a random nonce. Keep the nonce and source reference off-chain." },
   { ic: Ic.globe, h: "Permissionless ownership", p: "Anyone can create a campaign from their own keypair. Each campaign is owned by its creator — there is no global admin." },
   { ic: Ic.users, h: "Delegated redemption", p: "Owners grant explicit delegates the right to redeem at the point of sale, while keeping supply issuance owner-only." },
-  { ic: Ic.spark, h: "Sub-cent settlement", p: "Stellar fees are a fraction of a cent, making per-conversion USDC payouts to creators and referrers economically viable." },
-  { ic: Ic.terminal, h: "Copy-paste integration", p: "Every action ships ready-to-run code for the stellar CLI, TypeScript and Go — reflecting your exact inputs." },
+  { ic: Ic.spark, h: "Token settlement primitive", p: "Candidate v0.2 can settle a configured Stellar Asset Contract after an owner allowance. Network fees and asset choice remain deployment decisions." },
+  { ic: Ic.terminal, h: "Generated integration examples", p: "Actions produce Stellar CLI, TypeScript and Go examples from your inputs. Review deployment IDs, addresses and signer handling before running them." },
 ];
 function Benefits() {
   return (
@@ -132,9 +132,8 @@ function Benefits() {
 function Footer() {
   const SD = window.SD;
   const links = [
-    { t: "GitHub repo", h: "#" },
-    { t: "Protocol Spec", h: "#" },
-    { t: "Candidate SEP", h: "#" },
+    { t: "Protocol Spec · docs/SPEC.md", h: null },
+    { t: "Candidate SEP · docs/SEP.md", h: null },
     { t: "Contract on stellar.expert", h: SD.NET.explorer + "/contract/" + SD.NET.contractId },
   ];
   return (
@@ -145,16 +144,16 @@ function Footer() {
             <div className="brand" style={{ marginBottom: 12 }}>
               <span className="mark"><Logo className="logo" /><span className="word">Sorodeal</span></span>
             </div>
-            <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.55 }}>The open coupon protocol on Stellar — try it live.</p>
+            <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.55 }}>The open coupon protocol on Stellar — legacy v0.1 testnet preview.</p>
           </div>
           <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
               <span className="eyebrow" style={{ marginBottom: 4 }}>Protocol</span>
-              {links.map((l) => (
-                <a key={l.t} href={l.h} target={l.h.startsWith("http") ? "_blank" : undefined} rel="noopener"
+              {links.map((l) => l.h ? (
+                <a key={l.t} href={l.h} target="_blank" rel="noopener"
                    style={{ fontSize: 14, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 6 }}
                    className="footer-link">{l.t}<Ic.arrowUR style={{ width: 13, height: 13, opacity: .45 }} /></a>
-              ))}
+              ) : <span key={l.t} className="mono" style={{ fontSize: 12, color: "var(--ink-3)" }}>{l.t}</span>)}
             </div>
           </div>
         </div>

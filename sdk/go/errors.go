@@ -8,7 +8,7 @@ import (
 )
 
 // Code is a Sorodeal coupon-ledger contract error code (mirrors the contract's
-// `Error` enum, abi-v0.1.0). Returned inside a *ContractError.
+// `Error` enum, abi-v0.2.0). Returned inside a *ContractError.
 type Code uint32
 
 const (

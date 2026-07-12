@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════
    Sorodeal Playground — data layer (plain JS, attached to window.SD)
-   Testnet constants, simulated contract state, snippet generators.
+   Testnet constants, empty UI state, snippet generators.
    Mirrors contracts/coupon-ledger/src/lib.rs (Burn profile).
    ═══════════════════════════════════════════════════════════════════ */
 (function () {
@@ -9,6 +9,7 @@
     passphrase: "Test SDF Network ; September 2015",
     rpc: "https://soroban-testnet.stellar.org",
     contractId: "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX",
+    contractStatus: "deprecated-v0.1",
     ownerWallet: "GCIJM67CD2U6XPI5GYS5VYSNIYOKLH7DZ4XA3W45PID7DYCRYFTRDSV6",
     explorer: "https://stellar.expert/explorer/testnet",
   };
@@ -17,14 +18,6 @@
   function trunc(s, head = 4, tail = 4) {
     if (!s || s.length <= head + tail + 1) return s;
     return s.slice(0, head) + "…" + s.slice(-tail);
-  }
-
-  // ── random hex (tx hashes, etc) ─────────────────────────────
-  function hex(n) {
-    const c = "0123456789abcdef";
-    let o = "";
-    for (let i = 0; i < n; i++) o += c[(Math.random() * 16) | 0];
-    return o;
   }
 
   // ── random per-redemption nonce (the salt) ──────────────────
@@ -78,30 +71,14 @@
     return new Date(d).toLocaleTimeString("en-GB", { hour12: false });
   }
 
-  // ── seed contract state — Demo Cafe (so Verify works offline) ─
-  function seedState() {
-    const minted = nowUnix() - 60 * 60 * 26; // issued ~26h ago
-    const validUntil = nowUnix() + 60 * 60 * 24 * 30; // +30d
+  // UI mirrors only values actually read from or written to the contract.
+  // There is intentionally no seeded/demo chain state.
+  function initialState() {
     return {
-      campCtr: 1,
-      tokenCtr: 2,
-      campaigns: {
-        1: {
-          id: 1,
-          owner: NET.ownerWallet,
-          name: "Demo Cafe",
-          discount_type: "percentage",
-          discount_value: 1000,
-          total_supply: 100,
-          minted: 2,
-          burned: 0,
-          valid_until: validUntil,
-        },
-      },
-      tokens: {
-        "1:DEMO0001": { token_id: 1, campaign_id: 1, code: "DEMO0001", is_burned: false, minted_at: minted, redeemer_ref: ZERO32, burned_at: 0 },
-        "1:DEMO0002": { token_id: 2, campaign_id: 1, code: "DEMO0002", is_burned: false, minted_at: minted, redeemer_ref: ZERO32, burned_at: 0 },
-      },
+      campCtr: 0,
+      tokenCtr: 0,
+      campaigns: {},
+      tokens: {},
       delegates: {}, // `${campaignId}:${addr}` -> true
     };
   }
@@ -117,15 +94,15 @@
     Unauthorized:      { code: 6, title: "Unauthorized",         msg: "Only the campaign owner (or a delegate) can do this." },
     InvalidCode:       { code: 7, title: "Invalid code",         msg: "Provide at least one non-empty coupon code." },
     DuplicateCode:     { code: 8, title: "Duplicate code",       msg: "That code was already issued in this campaign — codes are unique per campaign." },
-    InvalidTerms:      { code: 9, title: "Invalid terms",        msg: "Supply must be > 0, expiry must be in the future, name must be 1–96 characters, and discount type must be 1–32 characters." },
+    InvalidTerms:      { code: 9, title: "Invalid terms",        msg: "Supply must be > 0, expiry must be in the future, name must be 1–96 UTF-8 bytes, and discount type must be 1–32 UTF-8 bytes." },
     BatchTooLarge:     { code: 10, title: "Batch too large",     msg: "Issue at most 100 codes per call." },
-    CodeTooLong:       { code: 11, title: "Code too long",       msg: "Coupon codes can be at most 64 characters." },
+    CodeTooLong:       { code: 11, title: "Code too long",       msg: "Coupon codes can be at most 64 UTF-8 bytes." },
     SharedNotFound:    { code: 12, title: "Shared code not found", msg: "No shared code is registered with that name in this campaign." },
     AlreadyRegistered: { code: 13, title: "Already registered",   msg: "That shared code is already registered in this campaign." },
     PeriodCommitted:   { code: 14, title: "Period already committed", msg: "A tally for this period was already committed — commitments are append-only." },
     TallyNotFound:     { code: 15, title: "Tally not found",      msg: "No tally has been committed for that code and period." },
     AlreadySettled:    { code: 16, title: "Already settled",      msg: "This tally period was already settled." },
-    InvalidTally:      { code: 17, title: "Invalid tally",        msg: "Per-attribution counts cannot exceed the committed total count." },
+    InvalidTally:      { code: 17, title: "Invalid tally",        msg: "For an attributed code, the attributed count must equal the committed total." },
     InvalidSettlement: { code: 18, title: "Invalid settlement",   msg: "Inconsistent settlement config: a payout token requires rate > 0, no token requires rate 0, and an unattributed code can't set a payout token (or the amount overflowed)." },
     AttributionMismatch: { code: 19, title: "Attribution mismatch", msg: "An attributed code can only credit its registered creator/referrer; an unattributed code can't carry per-attribution counts." },
   };
@@ -139,10 +116,12 @@
   function tsHeader() {
     return [
       `import {`,
-      `  Contract, TransactionBuilder, nativeToScVal, scValToNative,`,
+      `  Contract, Keypair, TransactionBuilder, nativeToScVal, scValToNative,`,
       `  rpc, Networks, BASE_FEE,`,
       `} from "@stellar/stellar-sdk";`,
       ``,
+      `const ownerKeypair = Keypair.fromSecret(process.env.SORODEAL_SECRET);`,
+      `const owner = ownerKeypair.publicKey();`,
       `const server = new rpc.Server("${NET.rpc}");`,
       `const contract = new Contract("${C}");`,
       `const source = await server.getAccount(owner);`,
@@ -151,9 +130,12 @@
   }
   function goHeader() {
     return [
-      `// go get github.com/stellar/go/...`,
-      `client := sorobanclient.New("${NET.rpc}")`,
-      `contractID := "${C}"`,
+      `// go get github.com/sorodeal/sorodeal-go`,
+      `kp := keypair.MustParseFull(os.Getenv("SORODEAL_SECRET"))`,
+      `// Compatibility preset: deprecated v0.1 testnet contract.`,
+      `client, err := sorodeal.Testnet(kp)`,
+      `if err != nil { return err }`,
+      `defer client.Close()`,
       ``,
     ].join("\n");
   }
@@ -174,8 +156,15 @@
       `  .build();\n\n` +
       `const prepared = await server.prepareTransaction(tx);\n` +
       `prepared.sign(ownerKeypair);\n` +
-      `const res = await server.sendTransaction(prepared);\n` +
-      `console.log(scValToNative(res.returnValue));`
+      `const submitted = await server.sendTransaction(prepared);\n` +
+      `if (submitted.status === "ERROR") throw new Error("transaction rejected");\n` +
+      `let result;\n` +
+      `do {\n` +
+      `  await new Promise((resolve) => setTimeout(resolve, 1000));\n` +
+      `  result = await server.getTransaction(submitted.hash);\n` +
+      `} while (result.status === "NOT_FOUND");\n` +
+      `if (result.status !== "SUCCESS") throw new Error("transaction failed");\n` +
+      `console.log(scValToNative(result.returnValue));`
     );
   }
 
@@ -206,14 +195,9 @@
       ]);
 
       const go = goHeader() + [
-        `campaignID, err := client.CreateCampaign(ctx, sorodeal.CampaignTerms{`,
-        `    Owner:         "${NET.ownerWallet}",`,
-        `    Name:          "${f.name || "Demo Cafe"}",`,
-        `    DiscountType:  "${f.discount_type}",`,
-        `    DiscountValue: ${f.discount_value || 1000}, // cents`,
-        `    TotalSupply:   ${f.total_supply || 100},`,
-        `    ValidUntil:    ${validUntil},`,
-        `})`,
+        `campaignID, err := client.CreateCampaign(ctx,`,
+        `    "${f.name || "Demo Cafe"}", "${f.discount_type}",`,
+        `    ${f.discount_value || 1000}, ${f.total_supply || 100}, ${validUntil})`,
         `if err != nil { return err }`,
         `log.Printf("campaign_id = %d", campaignID)`,
       ].join("\n");
@@ -223,7 +207,6 @@
 
     issue_unique(f) {
       const codes = (f.codes && f.codes.length ? f.codes : ["DEMO0003", "DEMO0004"]);
-      const cliCodes = codes.map((c) => `"${c}"`).join(" ");
       const cli = [
         `stellar contract invoke \\`,
         `  --id ${C} \\`,
@@ -244,11 +227,8 @@
       ]);
 
       const go = goHeader() + [
-        `tokenIDs, err := client.IssueUnique(ctx, sorodeal.IssueParams{`,
-        `    Owner:      "${NET.ownerWallet}",`,
-        `    CampaignID: ${f.campaign_id || 1},`,
-        `    Codes:      []string{${codes.map((c) => `"${c}"`).join(", ")}},`,
-        `})`,
+        `tokenIDs, err := client.IssueUnique(ctx, ${f.campaign_id || 1},`,
+        `    []string{${codes.map((c) => `"${c}"`).join(", ")}})`,
         `if err != nil { return err }`,
         `log.Printf("issued token_ids = %v", tokenIDs)`,
       ].join("\n");
@@ -286,16 +266,12 @@
         ]);
 
       const go = goHeader() + [
-        `// SHA-256(random nonce ∥ reference) — never plaintext PII (ADR-010).`,
-        `nonce := make([]byte, 16); rand.Read(nonce)`,
-        `sum := sha256.Sum256(append(nonce, []byte("|"+redeemerRef)...))`,
+        `// Randomized commitment — never plaintext PII on-chain (ADR-010).`,
+        `commitment, nonce, err := sorodeal.RedeemerCommitment(redeemerRef)`,
+        `if err != nil { return err }`,
+        `_ = nonce // store off-chain only if later proof is required`,
         ``,
-        `receipt, err := client.RedeemUnique(ctx, sorodeal.RedeemParams{`,
-        `    Authorizer:      "${NET.ownerWallet}",`,
-        `    CampaignID:      ${cid},`,
-        `    Code:            "${code}",`,
-        `    RedeemerRefHash: sum[:], // [32]byte`,
-        `})`,
+        `receipt, err := client.RedeemUnique(ctx, ${cid}, "${code}", commitment)`,
         `if err != nil { return err }`,
         `log.Printf("burned token=%d ledger=%d", receipt.TokenID, receipt.LedgerSeq)`,
       ].join("\n");
@@ -360,11 +336,7 @@
         `nativeToScVal("${f.delegate || "G…"}", { type: "address" }),`,
       ]);
       const go = goHeader() + [
-        `err := client.AddDelegate(ctx, sorodeal.DelegateParams{`,
-        `    Owner:      "${NET.ownerWallet}",`,
-        `    CampaignID: ${f.campaign_id || 1},`,
-        `    Delegate:   "${f.delegate || "G…"}",`,
-        `})`,
+        `err := client.AddDelegate(ctx, ${f.campaign_id || 1}, "${f.delegate || "G…"}")`,
       ].join("\n");
       return { cli, ts, go };
     },
@@ -372,6 +344,6 @@
 
   window.SD = {
     NET, ZERO32, ERRORS, DISCOUNT_LABEL, SNIP,
-    trunc, hex, randomNonce, redeemerHash, fmtDiscount, unix, nowUnix, fmtTs, fmtClock, seedState,
+    trunc, randomNonce, redeemerHash, fmtDiscount, unix, nowUnix, fmtTs, fmtClock, initialState,
   };
 })();

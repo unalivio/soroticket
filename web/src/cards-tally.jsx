@@ -28,11 +28,20 @@ function TallyRegister() {
   const [rate, setRate] = useState("50000");
   const [period, setPeriod] = useState("1");
   const [count, setCount] = useState("40");
-  const [attrCount, setAttrCount] = useState("30");
-  const [merkle] = useState(() => SD.hex(64));
+  const [attrCount, setAttrCount] = useState("40");
+  const [merkle, setMerkle] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+
+  const attributedArg = attr.trim() ? `'"${attr.trim()}"'` : "null";
+  const tokenArg = attr.trim() && token.trim() ? `'"${token.trim()}"'` : "null";
+  const effectiveRate = tokenArg === "null" ? "0" : (rate || "0");
+  const goRegister = attr.trim()
+    ? token.trim()
+      ? `creator := "${attr.trim()}"\npayoutToken := "${token.trim()}"\nrate, _ := new(big.Int).SetString("${effectiveRate}", 10)\nerr := client.RegisterShared(ctx, ${cid}, "${code.toUpperCase()}", &creator, &payoutToken, rate)`
+      : `creator := "${attr.trim()}"\nerr := client.RegisterShared(ctx, ${cid}, "${code.toUpperCase()}", &creator, nil, big.NewInt(0))`
+    : `err := client.RegisterShared(ctx, ${cid}, "${code.toUpperCase()}", nil, nil, big.NewInt(0))`;
 
   useEffect(() => { if (highlight) setCid(String(highlight)); }, [highlight]);
   useEffect(() => { if (wallet && !attr) setAttr(wallet.address); }, [wallet]);
@@ -50,9 +59,19 @@ function TallyRegister() {
         toast({ kind: "success", title: "Shared code registered", msg: `${code.toUpperCase()} is live under campaign #${cid}.` });
         setResult({ kind: "register" });
       } else {
+        if (!/^[0-9a-fA-F]{64}$/.test(merkle.trim())) {
+          const invalid = new Error("A real 32-byte Merkle root is required.");
+          invalid.sd = { title: "Invalid Merkle root", msg: invalid.message, code: "—" };
+          throw invalid;
+        }
+        if (attr.trim() && Number(attrCount) !== Number(count)) {
+          const invalid = new Error("For an attributed code, attributed count must equal total redemptions.");
+          invalid.sd = { title: "Invalid tally", msg: invalid.message, code: 17 };
+          throw invalid;
+        }
         const per = attr.trim() ? [[attr.trim(), Number(attrCount)]] : [];
         const attributed = per.length ? attrCount : 0; // toast must match what's actually sent
-        await commitTally(cid, code.trim().toUpperCase(), period, count, merkle, per);
+        await commitTally(cid, code.trim().toUpperCase(), period, count, merkle.trim(), per);
         toast({ kind: "success", title: "Tally committed", msg: `Period ${period}: ${count} redemptions (${attributed} attributed).` });
         setResult({ kind: "commit" });
       }
@@ -65,12 +84,12 @@ function TallyRegister() {
       `  --owner ${wallet ? wallet.address : "G…"} \\`,
       `  --campaign_id ${cid} \\`,
       `  --code "${code.toUpperCase()}" \\`,
-      `  --attributed_to '"${attr || "G…"}"' \\`,
-      `  --payout_token '"${token || "C…"}"' \\`,
-      `  --payout_rate ${rate || 0}`,
+      `  --attributed_to ${attributedArg} \\`,
+      `  --payout_token ${tokenArg} \\`,
+      `  --payout_rate ${effectiveRate}`,
     ]),
     ts: `// Token + rate are FIXED at registration (immutable). Then commit\n// periodic tallies: commit_tally(campaign_id, code, period, count,\n// merkle_root, per_attribution) — Merkle root of the epoch's signed receipts.`,
-    go: `client.RegisterShared(ctx, ${cid}, "${code.toUpperCase()}", "${attr || "G…"}", "${token || "C…"}", ${rate || 0})`,
+    go: `// import "math/big"\n${goRegister}\nif err != nil { return err }`,
   };
 
   return (
@@ -120,19 +139,16 @@ function TallyRegister() {
         <div className="field">
           <label>Attributed to creator</label>
           <input className="input mono" type="number" min="0" value={attrCount} onChange={(e) => setAttrCount(e.target.value)} />
-          <span className="help">Of the total, how many credit the address above</span>
+          <span className="help">For an attributed code this must equal the total; partial attribution is rejected.</span>
         </div>
         <div className="field">
-          <label>Merkle root <span className="authtag" style={{ fontSize: 10, padding: "1px 6px" }}>demo</span></label>
-          <div className="copy" style={{ padding: "10px 12px" }}>
-            <span className="val mono" style={{ fontSize: 12 }}>{SD.trunc(merkle, 10, 8)}</span>
-            <CopyBare value={merkle} display="" />
-          </div>
-          <span className="help">In production: the Merkle root of the epoch's signed receipts (auditable).</span>
+          <label>Merkle root <span className="req">*</span></label>
+          <input className="input mono" value={merkle} onChange={(e) => setMerkle(e.target.value)} placeholder="64 hex characters" />
+          <span className="help">SHA-256 Merkle root computed from the epoch's signed receipt payloads; no random/demo roots.</span>
         </div>
       </div>
       <div className="form-actions">
-        <Btn variant="primary" loading={busy === "commit"} onClick={() => run("commit")} icon={<Ic.hash style={{ width: 15, height: 15 }} />}>Commit tally</Btn>
+        <Btn variant="primary" loading={busy === "commit"} onClick={() => run("commit")} disabled={!/^[0-9a-fA-F]{64}$/.test(merkle.trim()) || (!!attr.trim() && Number(attrCount) !== Number(count))} icon={<Ic.hash style={{ width: 15, height: 15 }} />}>Commit tally</Btn>
         <span className="help">Append-only — one commitment per period</span>
       </div>
 
@@ -196,13 +212,13 @@ function TallySettle() {
 
   const snippets = {
     cli: tallyCli("get_tally", [`  --campaign_id ${cid} \\`, `  --code "${code.toUpperCase()}" \\`, `  --period ${period}`]),
-    ts: `// get_shared / get_tally / compute_payouts are public reads (anyone audits).\n// settle(owner, campaign_id, code, period) pays each attributed address —\n// the token + rate are read from the registered code, not passed in.`,
+    ts: `// Public reads expose the root and payout preview. A complete audit also\n// needs the signed receipts and Merkle inclusion proofs. Contract v0.2 lets any\n// fee payer settle after the owner approves a bounded token allowance.`,
     go: `tally, _ := client.GetTally(ctx, ${cid}, "${code.toUpperCase()}", ${period})`,
   };
 
   return (
     <ActionCard num="08" id="tally-settle" label="Audit & settle" title="Audit & settle" auth="public"
-      desc="Read a committed tally (anyone can audit the count against the Merkle root), preview payouts at the code's fixed rate, and — as the owner — settle: pay each attributed address in the code's fixed token. Trustless attribution + automatic payout (ADR-004)."
+      desc="Read a committed tally and preview payouts. Verifying the root requires the signed receipt set and inclusion proofs; the signer remains the trust anchor for genuine off-chain events. This legacy v0.1 playground still requires the owner to settle."
       snippets={snippets}>
       <div className="form-grid">
         <div className="field">
@@ -220,7 +236,7 @@ function TallySettle() {
       </div>
       <div className="form-actions">
         <Btn variant="primary" loading={busy === "view"} onClick={view}>{busy === "view" ? "Reading" : "View tally & payouts"}</Btn>
-        <span className="help">Public read — try campaign 1 · ROBERTOX · period 1</span>
+        <span className="help">Public read on the legacy seeded deployment; its 40/30 tally demonstrates the v0.1 underpayment flaw and is rejected by v0.2.</span>
       </div>
 
       {tally && (

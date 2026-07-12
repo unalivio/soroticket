@@ -101,7 +101,7 @@ const LC_STEPS = [
   { t: "Campaign", d: "Owner sets the terms", ic: Ic.spark },
   { t: "Code", d: "Unique codes issued", ic: Ic.hash },
   { t: "Redemption", d: "Burned, single-use", ic: Ic.fire },
-  { t: "Settlement", d: "Optional USDC payout", ic: Ic.globe },
+  { t: "Settlement", d: "Optional token payout · v0.2", ic: Ic.globe },
 ];
 function Lifecycle() {
   const [lit, setLit] = useState(0);
@@ -144,8 +144,8 @@ function Hero() {
             <h1 className="display">Issue, redeem &amp; verify coupons on-chain.</h1>
             <p className="lede">
               Sorodeal is a permissionless protocol for tokenized coupons and redeemable codes on
-              Stellar Soroban. This is the live testnet playground — call the contract, see real
-              results, and copy the exact integration code for every action.
+              Stellar Soroban. This playground calls the real but deprecated v0.1 testnet
+              deployment. Candidate v0.2 is built and tested, but is not deployed yet.
             </p>
             <div className="cta-row">
               {!wallet ? (
@@ -167,7 +167,7 @@ function Hero() {
             <div className="meta-row">
               <div className="meta-item">
                 <span className="k">Network</span>
-                <span className="net-pill" style={{ alignSelf: "flex-start" }}><span className="dot" />Stellar Testnet</span>
+                <span className="net-pill" style={{ alignSelf: "flex-start" }}><span className="dot" />Testnet · legacy v0.1</span>
               </div>
               <div className="meta-item">
                 <span className="k">Contract</span>
