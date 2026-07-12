@@ -25,6 +25,7 @@ implemented from policy extensions that still require design and code:
 |---|---|---|---|
 | Delivery promo (`SUPERBOWL10`) | 1 → many | Tally | v0.2 testnet + Cloud preview |
 | Creator / UGC code (`ROBERTOX`) | 1 → many, fixed attribution | Tally + payout | v0.2 testnet + Cloud preview |
+| Gift / delivery proof (gifted bottles → scanned servings) | 1 per venue → many scans | Tally + optional payout | v0.2 testnet + Cloud preview; see `docs/USE_CASES.md` |
 | Event ticket / unique voucher | many × (1 → 1) | Burn | v0.2 testnet + Cloud preview |
 | Loyalty threshold → reward | shared punches + unique rewards | Tally + Burn | Cloud preview; customer ledger is off-chain |
 | Referral with once-per-user rules | 1 per user → many | Tally + payout | Planned; anti-fraud/reversals absent |

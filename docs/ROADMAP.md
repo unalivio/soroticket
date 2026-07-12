@@ -85,6 +85,11 @@ targets so the console and documentation do not imply mock features are live.
 
 ## Product work after the release gates
 
+- [ ] Console QR deep-link generator for shared codes (gift/delivery-proof
+  campaigns print one label batch per venue; see `docs/USE_CASES.md`).
+- [ ] Per-customer policy caps on shared codes (Cloud-level knob over customer
+  commitments, e.g. one serving per phone per day) ahead of protocol-level
+  per-user limits.
 - [ ] Public verification API/widget with publishable keys and bounded
   pagination.
 - [ ] Ticket transfer/ownership extension and seat inventory.
