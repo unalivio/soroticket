@@ -97,9 +97,9 @@ func (s *server) handleCreateProgram(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	res, err := tx.Exec(`INSERT INTO campaigns
-	  (org_id, env, chain_id, kind, name, discount_type, discount_value, total_supply, valid_until, tx_hash, created_at)
-	  VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-		a.OrgID, a.Env, chainID, "loyalty", in.Name, in.RewardDiscountType, in.RewardDiscountValue, 10_000, validUntil, campaignTx, now)
+	  (org_id, env, chain_id, contract_id, kind, name, discount_type, discount_value, total_supply, valid_until, tx_hash, created_at)
+	  VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		a.OrgID, a.Env, chainID, currentContractID, "loyalty", in.Name, in.RewardDiscountType, in.RewardDiscountValue, 10_000, validUntil, campaignTx, now)
 	if err != nil {
 		writeProblem(w, 500, "program exists on-chain but local indexing failed")
 		return
@@ -302,13 +302,17 @@ func (s *server) handlePunch(w http.ResponseWriter, r *http.Request) {
 	var threshold, campID, sharedID, validUntil int64
 	var archived int
 	var chainID uint64
-	err := s.db.QueryRow(`SELECT lp.name, lp.threshold, lp.campaign_id, lp.earn_code, c.chain_id, sc.id, c.valid_until, c.archived
+	var rowContract string
+	err := s.db.QueryRow(`SELECT lp.name, lp.threshold, lp.campaign_id, lp.earn_code, c.chain_id, sc.id, c.valid_until, c.archived, c.contract_id
 	  FROM loyalty_programs lp JOIN campaigns c ON c.id = lp.campaign_id
 	  JOIN shared_codes sc ON sc.campaign_id = c.id AND sc.code = lp.earn_code
 	  WHERE lp.id = ? AND lp.org_id = ? AND lp.env = ?`, id, a.OrgID, a.Env).
-		Scan(&name, &threshold, &campID, &earn, &chainID, &sharedID, &validUntil, &archived)
+		Scan(&name, &threshold, &campID, &earn, &chainID, &sharedID, &validUntil, &archived, &rowContract)
 	if err != nil {
 		writeProblem(w, 404, "program not found")
+		return
+	}
+	if !s.requireCurrentContract(w, rowContract) {
 		return
 	}
 	if threshold <= 0 {

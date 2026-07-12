@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
   org_id INTEGER NOT NULL REFERENCES orgs(id),
   env TEXT NOT NULL,
   chain_id INTEGER NOT NULL,     -- on-chain campaign id (u64)
+  contract_id TEXT NOT NULL DEFAULT '', -- deployment stamp; ''/unknown fails closed on chain ops
   kind TEXT NOT NULL,            -- coupon|creator|voucher|ticket|loyalty
   name TEXT NOT NULL,
   discount_type TEXT NOT NULL,
@@ -417,6 +418,44 @@ func runSecurityMigrations(db *sql.DB, refKey []byte) error {
 	}
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("commit security migration: %w", err)
+	}
+	return nil
+}
+
+// runContractStampMigration (version 2) adds the per-campaign contract
+// deployment stamp. Rows that existed before the stamp were created against
+// the deprecated v0.1 deployment, so they are stamped as such and chain
+// operations on them fail closed — v0.2 restarts campaign numbering, so a
+// legacy chain_id resolved on the current contract would address a different
+// campaign.
+func runContractStampMigration(db *sql.DB) error {
+	var applied int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version=2`).Scan(&applied); err != nil {
+		return fmt.Errorf("read contract migration state: %w", err)
+	}
+	if applied == 1 {
+		return nil
+	}
+	var hasColumn int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('campaigns') WHERE name='contract_id'`).Scan(&hasColumn); err != nil {
+		return fmt.Errorf("inspect campaigns schema: %w", err)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin contract migration: %w", err)
+	}
+	defer tx.Rollback()
+	if hasColumn == 0 {
+		// Pre-stamp table: every existing row was created against v0.1.
+		if _, err := tx.Exec(`ALTER TABLE campaigns ADD COLUMN contract_id TEXT NOT NULL DEFAULT '` + legacyContractID + `'`); err != nil {
+			return fmt.Errorf("add campaigns.contract_id: %w", err)
+		}
+	}
+	if _, err := tx.Exec(`INSERT INTO schema_migrations (version,applied_at) VALUES (2,?)`, time.Now().Unix()); err != nil {
+		return fmt.Errorf("record contract migration: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit contract migration: %w", err)
 	}
 	return nil
 }

@@ -65,7 +65,7 @@ export function AuthPage() {
             </div>
           </div>
         </div>
-        <div className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>Testnet preview · legacy v0.1 contract · candidate v0.2 not deployed</div>
+        <div className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>Testnet preview · contract v0.2.0 · no mainnet funds</div>
       </div>
       <div className="auth-right">
         <div style={{ width: 400, display: "flex", flexDirection: "column", gap: 18 }}>

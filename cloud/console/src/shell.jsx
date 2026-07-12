@@ -55,10 +55,10 @@ export function Shell({ children }) {
       <div className="main">
         {env === "test" ? <>
           <div className="test-strip" />
-          <div className="test-banner">Test mode — deprecated v0.1 testnet contract, free. Candidate v0.2 is not deployed; nothing touches mainnet.</div>
+          <div className="test-banner">Test mode — v0.2.0 testnet contract, free. Nothing touches mainnet.</div>
         </> : <>
           <div className="test-strip" />
-          <div className="test-banner">Metered preview — deprecated v0.1 testnet contract. Candidate v0.2, mainnet and production billing are disabled.</div>
+          <div className="test-banner">Metered preview — v0.2.0 testnet contract. Mainnet and production billing are disabled.</div>
         </>}
         <div className="topbar2">
           <button className="org-btn">

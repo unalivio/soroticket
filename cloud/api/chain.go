@@ -24,6 +24,34 @@ import (
 // v1 runs both environments against the Stellar testnet contract: "test" is
 // free and "live" is only a metered preview. Mainnet is intentionally disabled.
 
+// currentContractID pins the reviewed v0.2.0 testnet deployment
+// (2026-07-12; see deployments/testnet-v0.2.0.json).
+const currentContractID = "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF"
+
+// legacyContractID is the deprecated v0.1 deployment. Rows stamped with it (or
+// with an empty/unknown stamp) fail closed on chain operations: v0.2 restarts
+// campaign numbering, so a legacy chain_id resolved on the current contract
+// would address a different campaign.
+const legacyContractID = "CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX"
+
+// errLegacyContract marks a row created on a superseded deployment.
+var errLegacyContract = errors.New("resource belongs to a superseded contract deployment")
+
+// requireCurrentContract fails closed (409) for rows not stamped with the
+// current deployment.
+func (s *server) requireCurrentContract(w http.ResponseWriter, rowContractID string) bool {
+	if rowContractID != currentContractID {
+		writeLegacyContractProblem(w)
+		return false
+	}
+	return true
+}
+
+func writeLegacyContractProblem(w http.ResponseWriter) {
+	writeProblem(w, http.StatusConflict,
+		"this resource was created on a previous contract deployment and is read-only in this preview; create a new campaign on the current deployment")
+}
+
 // loadOrCreateKEK loads the local key-encryption key (32 bytes) used to seal
 // custodial seeds at rest. v1: a 0600 file next to the DB; production: KMS.
 func loadOrCreateKEK(dir string) ([]byte, error) {
@@ -230,11 +258,12 @@ func (s *server) clientFor(orgID int64, env string) (*sd.Client, func(), error) 
 	if kp.Address() != pk {
 		return nil, nil, errors.New("custodial signing key does not match its stored public key")
 	}
-	// Pin the reviewed legacy deployment explicitly. Cloud must never inherit a
-	// future SDK default and silently switch contract semantics; enabling v0.2
-	// requires a deliberate migration plus its allowance-settlement gate.
+	// Pin the reviewed deployment explicitly. Cloud must never inherit a future
+	// SDK default and silently switch contract semantics; the move from v0.1 to
+	// v0.2.0 was a deliberate migration (allowance-based settlement gate,
+	// contract-stamped rows, fail-closed legacy guard).
 	c, err := sd.New(sd.Config{
-		ContractID:        sd.LegacyTestnetContractID,
+		ContractID:        currentContractID,
 		RPCURL:            sd.TestnetRPC,
 		NetworkPassphrase: sd.TestnetPassphrase,
 		Signer:            kp,

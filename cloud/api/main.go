@@ -52,6 +52,9 @@ func main() {
 	if err = runSecurityMigrations(db, refKey); err != nil {
 		log.Fatal(err)
 	}
+	if err = runContractStampMigration(db); err != nil {
+		log.Fatal(err)
+	}
 	s := &server{
 		db: db, kek: kek, refKey: refKey, locks: map[string]*sync.Mutex{},
 		loginAttempts: map[string]loginAttempt{}, rateWindows: map[string]rateWindow{},

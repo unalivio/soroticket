@@ -76,10 +76,21 @@ func (s *server) nextCommitPeriod(sharedID int64, now time.Time) (uint64, error)
 
 func (s *server) sharedByCampaignCode(a *authCtx, campaignID int64, code string) (sharedID int64, chainID uint64, attributedTo string, payoutRate string, campName string, err error) {
 	var attr sql.NullString
-	err = s.db.QueryRow(`SELECT sc.id, c.chain_id, sc.attributed_to, sc.payout_rate, c.name
+	var rowContract string
+	err = s.db.QueryRow(`SELECT sc.id, c.chain_id, sc.attributed_to, sc.payout_rate, c.name, c.contract_id
 	  FROM shared_codes sc JOIN campaigns c ON c.id = sc.campaign_id
 	  WHERE sc.campaign_id = ? AND sc.code = ? AND c.org_id = ? AND c.env = ?`,
-		campaignID, code, a.OrgID, a.Env).Scan(&sharedID, &chainID, &attr, &payoutRate, &campName)
+		campaignID, code, a.OrgID, a.Env).Scan(&sharedID, &chainID, &attr, &payoutRate, &campName, &rowContract)
+	if err != nil {
+		return
+	}
+	// Fail closed on rows from a superseded deployment: their chain_id would
+	// resolve to a different campaign on the current contract, and any event
+	// recorded here could never be committed on-chain.
+	if rowContract != currentContractID {
+		err = errLegacyContract
+		return
+	}
 	if attr.Valid {
 		attributedTo = attr.String
 	}
@@ -98,6 +109,9 @@ func (s *server) handleRegisterShared(w http.ResponseWriter, r *http.Request) {
 	}
 	if c.Archived {
 		writeProblem(w, http.StatusConflict, "campaign is archived")
+		return
+	}
+	if !s.requireCurrentContract(w, c.ContractID) {
 		return
 	}
 	var in struct {
@@ -173,6 +187,10 @@ func (s *server) handleRecordEvents(w http.ResponseWriter, r *http.Request) {
 	cid, _ := strconv.ParseInt(r.PathValue("cid"), 10, 64)
 	code := strings.ToUpper(r.PathValue("code"))
 	sharedID, chainID, _, _, campName, err := s.sharedByCampaignCode(a, cid, code)
+	if errors.Is(err, errLegacyContract) {
+		writeLegacyContractProblem(w)
+		return
+	}
 	if err != nil {
 		writeProblem(w, 404, "shared code not found")
 		return
@@ -301,6 +319,10 @@ func (s *server) handleCommitTally(w http.ResponseWriter, r *http.Request) {
 	cid, _ := strconv.ParseInt(r.PathValue("cid"), 10, 64)
 	code := strings.ToUpper(r.PathValue("code"))
 	sharedID, chainID, attributedTo, _, _, err := s.sharedByCampaignCode(a, cid, code)
+	if errors.Is(err, errLegacyContract) {
+		writeLegacyContractProblem(w)
+		return
+	}
 	if err != nil {
 		writeProblem(w, 404, "shared code not found")
 		return
@@ -515,6 +537,10 @@ func (s *server) handleSettle(w http.ResponseWriter, r *http.Request) {
 	}
 	code := strings.ToUpper(strings.TrimSpace(in.Code))
 	sharedID, chainID, _, _, campName, err := s.sharedByCampaignCode(a, in.CampaignID, code)
+	if errors.Is(err, errLegacyContract) {
+		writeLegacyContractProblem(w)
+		return
+	}
 	if err != nil {
 		writeProblem(w, 404, "shared code not found")
 		return
@@ -539,12 +565,32 @@ func (s *server) handleSettle(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "settlement is not configured for this code")
 		return
 	}
-	// Cloud currently targets the immutable v0.1 deployment. That contract
-	// requires the owner signature supplied by this custodial client and calls
-	// token.transfer directly; it does not consume an allowance. Creating one
-	// here would leave unnecessary spend authority behind. A future v0.2 Cloud
-	// deployment must be explicitly version-gated and approve only the exact
-	// period amount immediately before its allowance-based settlement.
+	// v0.2 settlement is allowance-based (checks-effects-interactions,
+	// keeper-triggerable). The capability gate: approve EXACTLY this period's
+	// payout immediately before settling, so no standing spend authority is
+	// left behind. If settlement fails after the approval (e.g. a concurrent
+	// keeper settles first), the exact-amount allowance expires on its own
+	// (~1h at testnet ledger times).
+	preview, err := cl.ComputePayouts(r.Context(), chainID, code, in.Period)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	totalDue := big.NewInt(0)
+	for _, p := range preview {
+		totalDue.Add(totalDue, p.Amount)
+	}
+	if totalDue.Sign() > 0 {
+		latest, err := cl.LatestLedger(r.Context())
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		if err := cl.ApproveSettlement(r.Context(), *shared.PayoutToken, totalDue, latest+720); err != nil {
+			writeErr(w, err)
+			return
+		}
+	}
 	payouts, err := cl.Settle(r.Context(), chainID, code, in.Period)
 	if err != nil {
 		writeErr(w, err)

@@ -25,6 +25,7 @@ var kindLabels = map[string]bool{"coupon": true, "creator": true, "voucher": tru
 type campaignOut struct {
 	ID            int64  `json:"id"`
 	ChainID       uint64 `json:"chain_id"`
+	ContractID    string `json:"contract_id"`
 	Kind          string `json:"kind"`
 	Name          string `json:"name"`
 	DiscountType  string `json:"discount_type"`
@@ -158,9 +159,9 @@ func (s *server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 	usedCharge += mcrCreateCampaign
 	now := time.Now().Unix()
 	res, err := s.db.Exec(`INSERT INTO campaigns
-	  (org_id, env, chain_id, kind, name, discount_type, discount_value, total_supply, valid_until, tx_hash, created_at)
-	  VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-		a.OrgID, a.Env, chainID, in.Kind, in.Name, in.DiscountType, in.DiscountValue, in.TotalSupply, in.ValidUntil, campaignTx, now)
+	  (org_id, env, chain_id, contract_id, kind, name, discount_type, discount_value, total_supply, valid_until, tx_hash, created_at)
+	  VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		a.OrgID, a.Env, chainID, currentContractID, in.Kind, in.Name, in.DiscountType, in.DiscountValue, in.TotalSupply, in.ValidUntil, campaignTx, now)
 	if err != nil {
 		writeInternal(w, err, "index created campaign")
 		return
@@ -189,12 +190,12 @@ func (s *server) handleCreateCampaign(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) campaignByID(a *authCtx, id int64) (*campaignOut, error) {
-	row := s.db.QueryRow(`SELECT id, chain_id, kind, name, discount_type, discount_value, total_supply,
+	row := s.db.QueryRow(`SELECT id, chain_id, contract_id, kind, name, discount_type, discount_value, total_supply,
 	  valid_until, minted, burned, archived, COALESCE(tx_hash,''), created_at
 	  FROM campaigns WHERE id = ? AND org_id = ? AND env = ?`, id, a.OrgID, a.Env)
 	var o campaignOut
 	var archived int
-	if err := row.Scan(&o.ID, &o.ChainID, &o.Kind, &o.Name, &o.DiscountType, &o.DiscountValue,
+	if err := row.Scan(&o.ID, &o.ChainID, &o.ContractID, &o.Kind, &o.Name, &o.DiscountType, &o.DiscountValue,
 		&o.TotalSupply, &o.ValidUntil, &o.Minted, &o.Burned, &archived, &o.TxHash, &o.CreatedAt); err != nil {
 		return nil, err
 	}
@@ -352,6 +353,9 @@ func (s *server) handleIssueCodes(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "campaign is archived")
 		return
 	}
+	if !s.requireCurrentContract(w, c.ContractID) {
+		return
+	}
 	var in struct {
 		Codes    []string `json:"codes"`
 		Generate *struct {
@@ -481,6 +485,9 @@ func (s *server) handleVerify(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 404, "campaign not found")
 		return
 	}
+	if !s.requireCurrentContract(w, c.ContractID) {
+		return
+	}
 	cl, release, err := s.clientFor(a.OrgID, a.Env)
 	if err != nil {
 		writeErrFunding(w, err)
@@ -522,6 +529,9 @@ func (s *server) handleRedeem(w http.ResponseWriter, r *http.Request) {
 	}
 	if c.Archived {
 		writeProblem(w, http.StatusConflict, "campaign is archived")
+		return
+	}
+	if !s.requireCurrentContract(w, c.ContractID) {
 		return
 	}
 

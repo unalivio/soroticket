@@ -56,7 +56,7 @@ export function CampaignDetailPage({ id }) {
                 <span className="authtag">{kindTag(c)} · {c.discount_value}{c.discount_type === "percentage" ? "% off" : ` ${c.discount_type}`}</span>
                 <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>
                   campaign #{c.chain_id} · created {fmtDate(c.created_at)} ·{" "}
-                  <a href={`https://stellar.expert/explorer/testnet/contract/CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX`} target="_blank" rel="noreferrer">↗ stellar.expert</a>
+                  <a href={`https://stellar.expert/explorer/testnet/contract/${c.contract_id || "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF"}`} target="_blank" rel="noreferrer">↗ stellar.expert</a>
                 </span>
               </div>
             </div>
