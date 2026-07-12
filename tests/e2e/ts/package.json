@@ -7,6 +7,6 @@
   "scripts": { "e2e": "node e2e.mjs" },
   "dependencies": {
     "@sorodeal/sdk": "file:../../../sdk/ts",
-    "@stellar/stellar-sdk": "^15.0.0"
+    "@stellar/stellar-sdk": "^16.0.1"
   }
 }

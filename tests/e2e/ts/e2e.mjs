@@ -11,7 +11,7 @@
  *
  *   npm install && npm run e2e
  */
-import { sorodeal, keypairSigner, contractErrorCode } from "@sorodeal/sdk";
+import { sorodeal, keypairSigner, contractErrorCode, approveSettlement, TESTNET } from "@sorodeal/sdk";
 import { Keypair } from "@stellar/stellar-sdk";
 import { createHash } from "node:crypto";
 
@@ -117,7 +117,7 @@ function client(secret) {
 // ═══════════════════════════════════════════════════════════════════
 async function main() {
   console.log("Sorodeal TS SDK — end-to-end against testnet");
-  console.log("contract: CBSTBPSCSUXWK57OBQN7QKGS56WUDNJBURV5PD5ZDUHTR2KQYC52QDBX\n");
+  console.log(`contract: ${TESTNET.contractId}\n`);
 
   const owner = Keypair.random(), delegate = Keypair.random(), stranger = Keypair.random(), creator = Keypair.random();
   console.log("funding 4 ephemeral accounts via friendbot…");
@@ -314,14 +314,17 @@ async function main() {
   await step("get_shared not found → #12 SharedNotFound", () =>
     wantCode(() => pub.get_shared({ campaign_id: ugc, code: "GHOST" }), E.SharedNotFound));
 
-  // ── commit_tally ─────────────────────────────────────────────────
-  await step("commit_tally (attributed) → get_tally matches", async () => {
+  // ── commit_tally — v0.2 requires EXACT attribution: an attributed code
+  // must credit its creator for the full committed count. ──────────────
+  await step("commit_tally (attributed, exact) → get_tally matches", async () => {
     const attr = new Map([[creatorAddr, 3]]);
-    await okWrite(() => O.commit_tally({ owner: ownerAddr, campaign_id: ugc, code: "ROBERTOX", period: 1n, count: 5, merkle_root: ref("merkle-1"), per_attribution: attr }));
+    await okWrite(() => O.commit_tally({ owner: ownerAddr, campaign_id: ugc, code: "ROBERTOX", period: 1n, count: 3, merkle_root: ref("merkle-1"), per_attribution: attr }));
     const t = await okRead(() => pub.get_tally({ campaign_id: ugc, code: "ROBERTOX", period: 1n }));
-    assert(t.count === 5, "count");
+    assert(t.count === 3, "count");
     assert(Number(mapGet(t.per_attribution, creatorAddr)) === 3, "per_attribution");
   });
+  await step("commit_tally partial attribution → #17 InvalidTally (v0.2)", () =>
+    wantCode(() => O.commit_tally({ owner: ownerAddr, campaign_id: ugc, code: "ROBERTOX", period: 4n, count: 5, merkle_root: ref("m"), per_attribution: new Map([[creatorAddr, 3]]) }), E.InvalidTally));
   await step("commit_tally same period again → #14 PeriodCommitted", () =>
     wantCode(() => O.commit_tally({ owner: ownerAddr, campaign_id: ugc, code: "ROBERTOX", period: 1n, count: 2, merkle_root: ref("m"), per_attribution: new Map([[creatorAddr, 1]]) }), E.PeriodCommitted));
   await step("commit_tally crediting wrong addr → #19 AttributionMismatch", () =>
@@ -342,8 +345,14 @@ async function main() {
     assert(ps[0].to === creatorAddr, "recipient");
     assert(ps[0].amount === 3000n, "3 * 1000 = 3000 stroops");
   });
-  await step("settle pays the attributed creator (real transfer)", async () => {
-    const ps = await okWrite(() => O.settle({ owner: ownerAddr, campaign_id: ugc, code: "ROBERTOX", period: 1n }));
+  // v0.2 settlement is allowance-based and permissionless: the owner grants
+  // the contract an exact allowance, then ANY keeper can trigger the payout.
+  await step("settle without allowance → #18 InvalidSettlement (v0.2)", () =>
+    wantCode(() => O.settle({ owner: ownerAddr, campaign_id: ugc, code: "ROBERTOX", period: 1n }), E.InvalidSettlement));
+  await step("owner approves the exact settlement allowance", () =>
+    approveSettlement({ ownerSecret: owner.secret(), payoutToken: NATIVE_SAC, amount: 3000n }));
+  await step("third-party keeper settles for the owner (real transfer)", async () => {
+    const ps = await okWrite(() => S.settle({ owner: ownerAddr, campaign_id: ugc, code: "ROBERTOX", period: 1n }));
     assert(ps.length === 1, "one payout made");
     assert(ps[0].to === creatorAddr, "paid creator");
     assert(ps[0].amount === 3000n, "paid 3000 stroops");
@@ -351,7 +360,7 @@ async function main() {
   await step("settle again → #16 AlreadySettled", () =>
     wantCode(() => O.settle({ owner: ownerAddr, campaign_id: ugc, code: "ROBERTOX", period: 1n }), E.AlreadySettled));
   await step("settle count-only code → #18 InvalidSettlement", async () => {
-    await okWrite(() => O.commit_tally({ owner: ownerAddr, campaign_id: ugc, code: "COUNTONLY", period: 2n, count: 5, merkle_root: ref("m2"), per_attribution: new Map([[creatorAddr, 1]]) }));
+    await okWrite(() => O.commit_tally({ owner: ownerAddr, campaign_id: ugc, code: "COUNTONLY", period: 2n, count: 1, merkle_root: ref("m2"), per_attribution: new Map([[creatorAddr, 1]]) }));
     await wantCode(() => O.settle({ owner: ownerAddr, campaign_id: ugc, code: "COUNTONLY", period: 2n }), E.InvalidSettlement);
   });
   await step("bump_tally ok; unknown shared → #12 SharedNotFound", async () => {

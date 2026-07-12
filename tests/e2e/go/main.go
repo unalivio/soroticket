@@ -392,10 +392,11 @@ func main() {
 		return wantCode(err, sd.ErrSharedNotFound)
 	})
 
-	// commit_tally
-	h.step("commit_tally (attributed) → get_tally matches", func() error {
+	// commit_tally — v0.2 requires EXACT attribution: an attributed code must
+	// credit its creator for the full committed count (attributed == count).
+	h.step("commit_tally (attributed, exact) → get_tally matches", func() error {
 		attr := map[string]uint32{creatorAddr: 3}
-		if err := ownerC.CommitTally(ctx, ugc, "ROBERTOX", 1, 5, refHash("merkle-1"), attr); err != nil {
+		if err := ownerC.CommitTally(ctx, ugc, "ROBERTOX", 1, 3, refHash("merkle-1"), attr); err != nil {
 			return err
 		}
 		t, err := pub.GetTally(ctx, ugc, "ROBERTOX", 1)
@@ -403,9 +404,13 @@ func main() {
 			return err
 		}
 		return all(
-			assert(t.Count == 5, "count"),
+			assert(t.Count == 3, "count"),
 			assert(t.PerAttribution[creatorAddr] == 3, "per_attribution"),
 		)
+	})
+	h.step("commit_tally partial attribution → #17 InvalidTally (v0.2)", func() error {
+		attr := map[string]uint32{creatorAddr: 3}
+		return wantCode(ownerC.CommitTally(ctx, ugc, "ROBERTOX", 4, 5, refHash("m"), attr), sd.ErrInvalidTally)
 	})
 	h.step("commit_tally same period again → #14 PeriodCommitted", func() error {
 		attr := map[string]uint32{creatorAddr: 1}
@@ -444,8 +449,31 @@ func main() {
 			assert(ps[0].Amount.Cmp(big.NewInt(3000)) == 0, "3 * 1000 = 3000 stroops"),
 		)
 	})
-	h.step("settle pays the attributed creator (real transfer)", func() error {
-		ps, err := ownerC.Settle(ctx, ugc, "ROBERTOX", 1)
+	// v0.2 settlement is allowance-based and permissionless: the owner grants
+	// the contract an exact allowance, then ANY keeper can trigger the payout.
+	h.step("settle without allowance → #18 InvalidSettlement (v0.2)", func() error {
+		return wantCode(mustErr(ownerC.Settle(ctx, ugc, "ROBERTOX", 1)), sd.ErrInvalidSettlement)
+	})
+	h.step("owner approves the exact settlement allowance", func() error {
+		latest, err := ownerC.LatestLedger(ctx)
+		if err != nil {
+			return err
+		}
+		if err := ownerC.ApproveSettlement(ctx, nativeSAC, big.NewInt(3000), latest+200); err != nil {
+			return err
+		}
+		a, err := pub.SettlementAllowance(ctx, nativeSAC, owner.Address())
+		if err != nil {
+			return err
+		}
+		return assert(a.Cmp(big.NewInt(3000)) == 0, "allowance equals the exact payout total")
+	})
+	h.step("third-party keeper settles for the owner (real transfer)", func() error {
+		ps, err := strangerC.SettleFor(ctx, owner.Address(), ugc, "ROBERTOX", 1)
+		if err != nil {
+			return err
+		}
+		remaining, err := pub.SettlementAllowance(ctx, nativeSAC, owner.Address())
 		if err != nil {
 			return err
 		}
@@ -453,6 +481,7 @@ func main() {
 			assert(len(ps) == 1, "one payout made"),
 			assert(ps[0].To == creatorAddr, "paid creator"),
 			assert(ps[0].Amount.Cmp(big.NewInt(3000)) == 0, "paid 3000 stroops"),
+			assert(remaining.Sign() == 0, "allowance fully consumed"),
 		)
 	})
 	h.step("settle again → #16 AlreadySettled", func() error {
@@ -460,7 +489,7 @@ func main() {
 	})
 	h.step("settle count-only code → #18 InvalidSettlement", func() error {
 		attr := map[string]uint32{creatorAddr: 1}
-		if err := ownerC.CommitTally(ctx, ugc, "COUNTONLY", 2, 5, refHash("m2"), attr); err != nil {
+		if err := ownerC.CommitTally(ctx, ugc, "COUNTONLY", 2, 1, refHash("m2"), attr); err != nil {
 			return err
 		}
 		return wantCode(mustErr(ownerC.Settle(ctx, ugc, "COUNTONLY", 2)), sd.ErrInvalidSettlement)
