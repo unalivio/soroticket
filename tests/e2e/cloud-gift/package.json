@@ -1,0 +1,11 @@
+{
+  "name": "sorodeal-gift-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Proof-of-gift/delivery consumer demo against Sorodeal Cloud (testnet preview).",
+  "scripts": { "demo": "node gift-demo.mjs" },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^16.0.1"
+  }
+}
