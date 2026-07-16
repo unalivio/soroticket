@@ -7,6 +7,13 @@ dependencias directas del workspace.
 Naturaleza: revisión interna asistida; no sustituye una auditoría independiente,
 análisis formal ni pruebas de producción.
 
+> **Addendum (2026-07-12/16):** este documento es una fotografía fechada. Tras
+> el cierre, v0.2.0 fue desplegado a testnet con autorización explícita
+> (`deployments/testnet-v0.2.0.json`), Cloud migró a ese contrato y una
+> revisión externa posterior motivó recibos v2, auditoría por deployment y
+> reconciliación de settlements (ver `docs/ROADMAP.md` y ADR-017/018). El
+> dictamen "no-go para mainnet o valor real" sigue vigente.
+
 ## Dictamen ejecutivo
 
 **No-go para mainnet o valor real.** El contrato v0.1 desplegado en testnet es

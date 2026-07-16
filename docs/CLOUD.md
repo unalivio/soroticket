@@ -78,6 +78,11 @@ current contract would address a different campaign.
   Cloud HMACs these values and enforces uniqueness inside their code/program,
   so changing the HTTP idempotency key cannot count the same referenced event
   twice. Omitting the business reference opts out of this second layer.
+- Shared events may also declare integrator evidence metadata —
+  `evidence_type` and `policy_version` (≤32 bytes) and `context_hash`
+  (lowercase hex, ≤64 chars). Cloud does not interpret them; they are embedded
+  verbatim in the signed receipt so an integration binds its own evidence
+  policy to the attestation (see docs/USE_CASES.md).
 
 ## 3. Implemented endpoints
 
@@ -116,6 +121,15 @@ calling the allowance-based `settle`, and leaves no standing spend authority
 behind. If settlement fails after the approval, the exact-amount allowance
 expires on its own (~1 hour of ledgers).
 
+Settlement is permissionless on-chain, and allowances are per owner+token
+rather than per period, so an external keeper can legitimately settle a
+committed period first. Cloud checks `is_settled` before approving and
+reconciles periods settled by third parties — the local row is marked settled
+without fabricating a transaction hash — and applies the same reconciliation
+when a keeper wins the race between Cloud's approval and its own settle call.
+The structural fix (per-obligation escrow) is a v0.3 design question
+(ADR-018).
+
 ## 4. Credits and metering
 
 Credits use integer millicredits (`1 cr = 1,000 mcr`). METERED reserves credits
@@ -143,29 +157,43 @@ implemented.
 
 ## 5. Signed receipts and Merkle audit
 
-Recording a shared event or loyalty punch produces canonical JSON:
+Recording a shared event or loyalty punch produces canonical JSON (v2):
 
 ```json
 {
-  "version": 1,
+  "version": 2,
+  "network": "testnet",
+  "contract_id": "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF",
   "campaign_id": 42,
   "code": "SAVE10",
   "count": 1,
   "customer_commitment": "optional HMAC hex",
   "order_commitment": "optional HMAC hex",
+  "evidence_type": "optional, integrator-declared",
+  "context_hash": "optional opaque hex",
+  "policy_version": "optional, integrator-declared",
   "timestamp": 1783790000,
   "nonce": "32 hex chars",
   "signer": "G..."
 }
 ```
 
+Version 2 makes every receipt unambiguous across networks and contract
+deployments and lets an integrator bind its own evidence policy into the
+signed payload. Version 1 receipts (issued before 2026-07-16) remain stored
+and verifiable exactly as issued.
+
 The signer signs the exact UTF-8 JSON bytes with Ed25519. `leaf_hash` is
 `SHA-256(payload)` and the signature is standard Base64. Parent nodes are
 `SHA-256(left || right)`; an unpaired odd node is promoted unchanged.
 
-The public audit endpoint checks the global receipt count, recomputes the root
-from every stored leaf hash, and re-hashes/verifies the payload, signature,
-metadata and inclusion proof for each receipt in the requested page. Pages use
+The public audit endpoint resolves `chain_id + code + period` against the
+**current** contract deployment by default (chain ids restart across
+deployments) and echoes `network` and `contract_id`; `?contract=` addresses
+the deprecated deployment explicitly for historical audits. It checks the
+global receipt count, recomputes the root from every stored leaf hash, and
+re-hashes/verifies the payload, signature, metadata and inclusion proof for
+each receipt in the requested page. Pages use
 `cursor` plus `limit` (default/max 100) and the public route is limited to 30
 requests/minute per source IP. One tally contains at most 10,000 signed
 receipts; if more are pending, a commit anchors the first batch and returns
@@ -223,7 +251,8 @@ Consumers must reject stale timestamps and deduplicate delivery IDs.
 - MFA/passkeys, email verification and password reset.
 - Automatic TTL bumping and automatic tally commit schedules.
 - Durable outbox/reconciliation when a chain write succeeds but the local
-  SQLite update fails.
+  SQLite update fails, and the PostgreSQL migration that rides on it
+  (design: ADR-017).
 - Multi-instance locks, distributed rate limiting and distributed idempotency.
 - Cursor pagination and a publishable-key/public verification surface.
 - Retention/deletion controls, backup validation and production observability.

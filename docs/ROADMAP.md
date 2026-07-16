@@ -43,6 +43,21 @@ targets so the console and documentation do not imply mock features are live.
 - [x] Recharge endpoint fails with `501 Not Implemented` instead of returning a
   pretend payment destination.
 
+## Hardening after the 2026-07-16 external review
+
+- [x] Signed receipt v2: network + contract deployment identity plus optional
+  integrator evidence metadata (`evidence_type`/`context_hash`/
+  `policy_version`); v1 receipts remain verifiable as issued.
+- [x] Public audit route scoped by contract deployment — `chain_id` ambiguity
+  across v0.1/v0.2 removed; responses carry `network` + `contract_id`.
+- [x] Settlement reconciliation for permissionless keepers: `is_settled`
+  pre-check plus post-race reconciliation, never fabricating a tx hash.
+- [x] Console: sign-out menu, derived loyalty status, display-only org chip,
+  batch-issue partial failures surfaced, onboarding checklist completes.
+- [ ] Operation journal/outbox + PostgreSQL migration (ADR-017) — the next
+  major Cloud work before charging for the API.
+- [ ] v0.3 settlement isolation design (ADR-018).
+
 ## v0.2 testnet release gates (completed 2026-07-12)
 
 - [x] Security report reviewed; deployment explicitly authorized by the
@@ -72,16 +87,16 @@ targets so the console and documentation do not imply mock features are live.
   independent external audit.
 - [ ] Data retention/deletion policy, backups and incident-response exercises.
 
-## Console polish (quick wins, non-blocking)
+## Console polish (quick wins — completed 2026-07-16)
 
-- [ ] Wire a sign-out control to `POST /auth/logout` (endpoint exists; no UI yet).
-- [ ] Loyalty status pill is hardcoded `Active`; derive it (archived/expired
-  programs 409 punches with no UI explanation).
-- [ ] Org switcher / user-avatar buttons are inert; give them a menu or make
-  them non-interactive.
-- [ ] Batch-issue partial success returns HTTP 207 but the toast reports it as a
-  clean success and drops the `error` member.
-- [ ] First-run checklist step 4 ("Get your API key") never marks done.
+- [x] Sign-out lives in the user-avatar menu (`POST /auth/logout`).
+- [x] Loyalty status pill derives Archived/Expired/Active from the backing
+  campaign (API exposes `archived` + `valid_until`).
+- [x] Org chip is display-only until orgs/teams land; user avatar opens a menu.
+- [x] Batch-issue 207 surfaces the partial failure and its error message.
+- [x] First-run checklist completes step 4 from the live API-key count.
+- [ ] Campaign detail shows only the first shared code; surface all venue
+  codes of a gift campaign (Settlements already lists them all).
 
 ## Product work after the release gates
 

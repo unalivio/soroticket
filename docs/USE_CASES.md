@@ -76,13 +76,19 @@ integrator regardless of granularity.
 - Abuse detection is an integrator-layer responsibility by design: Sorodeal
   supplies the opaque commitments and the tamper-evident record, the
   integrator applies the policy (e.g. suspend deliveries).
+- Communicate it accordingly: "validated scan", "registered delivery",
+  "immutable proof of the recorded event" — an attestation under the
+  integrator's declared policy — never "universal proof of physical
+  consumption".
 
 ### Status
 
 - **implemented** — `gift` campaign kind (Cloud API + console wizard),
   per-venue shared codes with optional attribution/payout, customer/order
-  commitments and dedup, signed receipts, on-chain commits, the public audit
-  route and exact-allowance keeper settlement. Runnable demo:
+  commitments and dedup, signed receipts with integrator evidence metadata
+  (`evidence_type`/`context_hash`/`policy_version`, e.g. `whatsapp_scan`
+  under your policy version), on-chain commits, the contract-scoped public
+  audit route and exact-allowance keeper settlement. Runnable demo:
   `tests/e2e/cloud-gift/`.
 - **planned** — console QR deep-link generator; per-customer policy caps
   (e.g. one serving per phone per day) as a Cloud-level knob; per-code global

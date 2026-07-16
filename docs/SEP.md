@@ -2,8 +2,8 @@
 
 > **Candidate / Draft.** This is a pre-submission draft of a Stellar Ecosystem
 > Proposal. It synthesizes the reference implementation in this repository
-> (`contracts/coupon-ledger/`, candidate v0.2 not yet deployed) into a standard
-> interface. The existing v0.1 testnet deployment is deprecated.
+> (`contracts/coupon-ledger/`, v0.2.0, deployed to testnet on 2026-07-12) into
+> a standard interface. The earlier v0.1 testnet deployment is deprecated.
 > Section numbers and the SEP number are placeholders until assigned.
 
 ## Preamble
@@ -18,7 +18,8 @@ Created: 2026-05-31
 Version: 0.2.0-draft
 Discussion: <fill-in: GitHub discussion / Stellar Dev Discord thread>
 Reference implementation: https://github.com/<org>/sorodeal
-  (candidate ABI: contracts/coupon-ledger/abi-v0.2.0.txt; not deployed)
+  (ABI: contracts/coupon-ledger/abi-v0.2.0.txt; testnet:
+  CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF)
 ```
 
 ## Summary

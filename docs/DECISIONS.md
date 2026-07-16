@@ -141,3 +141,65 @@ deployment migration.
 **Consequences:** A future contract upgrade requires a reviewed configuration
 change, migration/reconciliation plan and capability tests. METERED refers only
 to preview credits and does not imply mainnet, production billing or live value.
+
+## ADR-017 — Chain–DB atomicity: operation journal (outbox) before engine choice
+
+**Context:** Cloud writes to two systems that cannot commit atomically: Stellar
+transactions and the local database (index, credits, receipts). The failure
+window is narrowed today case by case — loyalty issues rewards on-chain first
+and commits local rows in one SQL transaction, idempotency keys are reserved
+before execution, business references deduplicate events — but a crash between
+a confirmed chain write and its local indexing still requires manual
+reconciliation. Separately, SQLite (single process, one writer) is the preview
+store; a paid API needs PostgreSQL for concurrency, constraints, observability
+and multi-instance deployments.
+
+**Decision:** Introduce a durable operation journal (outbox) as the single
+choke point for every chain-writing operation, before and independently of the
+engine migration:
+
+1. Record intent locally first, under a deterministic business key
+   (org, env, operation, resource, period/idempotency identity).
+2. Drive each entry through `pending → submitted → confirmed → indexed` (or
+   `failed`), persisting the tx hash as soon as it exists.
+3. Retries always resume the SAME journal entry and consult chain state before
+   re-submitting — the entry, not the HTTP request, is the unit of work, so
+   nothing can be double-issued.
+4. A periodic reconciler sweeps non-terminal entries against chain truth
+   (`is_settled`, `verify`, transaction lookup), and unique constraints cover
+   events, rewards, periods and settlements.
+
+PostgreSQL is adopted with (not before) this journal: the schema is written
+engine-portable and the migration carries users, orgs, sealed key blobs, index
+tables and the journal itself.
+
+**Consequences:** The chain/DB boundary becomes crash-recoverable and
+observable — every stuck operation is a visible journal row — at the cost of
+one extra local write per chain operation. Multi-instance deployment still
+additionally requires distributed locks/idempotency (ROADMAP production
+blockers). Until the journal lands, Cloud remains a single-instance preview
+and the documented failure windows stand.
+
+## ADR-018 — Settlement isolation for multi-keeper safety (Proposed, v0.3)
+
+**Context:** v0.2 settlement is permissionless by design: the owner grants the
+contract a token allowance and any keeper triggers `settle`. Allowances are per
+owner+token — not per obligation — so when one owner has several committed
+periods, a keeper can consume the allowance the owner intended for a different
+period. Cloud narrows this operationally (exact-amount approvals immediately
+before settling, `is_settled` pre-checks, reconciliation of externally settled
+periods, short allowance expiries), but the ambiguity is structural.
+
+**Decision (proposed):** For contract v0.3, evaluate binding settlement funds
+to their obligation instead of to their owner: a per-campaign (or per-period)
+escrow/vault that the owner funds explicitly and from which `settle` pays out.
+The alternative — keeping allowances but adding on-chain per-period
+reservation — stays on the table if escrow UX proves too heavy. Either way,
+v0.3 must keep settlement permissionless and funds owner-recoverable (no
+admin, per ADR-001).
+
+**Consequences:** Not a v0.2 change: the deployed contract is immutable and
+its behavior is documented honestly (docs/CLOUD.md). Cloud reconciliation
+remains necessary regardless — external keepers are a feature, not a fault.
+Any v0.3 settlement redesign is gated on a written escrow-vs-reserved-allowance
+comparison covering rent costs and recovery paths.
