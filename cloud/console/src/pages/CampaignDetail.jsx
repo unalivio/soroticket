@@ -223,7 +223,13 @@ function IssueModal({ c, onClose }) {
         ? { generate: { count: Number(count), prefix } }
         : { codes: pasted.split(/[\s,]+/).filter(Boolean) };
       const r = await api.postIdem(`/v1/campaigns/${c.id}/codes`, body, idemKey());
-      toast(`${r.issued.length} codes issued`, "Written on-chain — QR payloads in the CSV export.");
+      if (r.error) {
+        // HTTP 207: earlier chunks landed on-chain, a later one failed
+        toast(`${r.issued.length} of ${n} codes issued — batch stopped early`,
+          r.error.message || "The remaining codes were not issued; retry them.", "error");
+      } else {
+        toast(`${r.issued.length} codes issued`, "Written on-chain — QR payloads in the CSV export.");
+      }
       onClose(true);
     } catch (e) { setErr(e); setBusy(false); }
   };

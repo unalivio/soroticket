@@ -52,10 +52,10 @@ function ActivityRow({ a }) {
 
 function Checklist({ data, nav }) {
   const steps = [
-    { t: "Create your first campaign", d: "A coupon, ticket batch or loyalty program — one primitive, five faces.", done: data.active_campaigns > 0, go: "/campaigns?new=1" },
+    { t: "Create your first campaign", d: "A coupon, ticket batch or loyalty program — one primitive, six faces.", done: data.active_campaigns > 0, go: "/campaigns?new=1" },
     { t: "Issue codes", d: "Generate a batch or paste your own list — QR payloads included.", done: data.activity?.some((a) => a.kind === "issue"), go: "/campaigns" },
     { t: "Make a test redemption", d: "From the console or with one curl — see the receipt land on testnet.", done: data.activity?.some((a) => a.kind === "redemption"), go: "/redemptions?redeem=1" },
-    { t: "Get your API key", d: "Wire redemptions into your POS, bot or backend.", done: false, go: "/keys" },
+    { t: "Get your API key", d: "Wire redemptions into your POS, bot or backend.", done: (data.api_keys ?? 0) > 0, go: "/keys" },
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const firstOpen = steps.findIndex((s) => !s.done);

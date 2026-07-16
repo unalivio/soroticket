@@ -16,8 +16,16 @@ const NAV = [
 ];
 
 export function Shell({ children }) {
-  const { org, env, setEnv, route, nav, user } = useApp();
+  const { org, env, setEnv, route, nav, user, refreshMe } = useApp();
   const [credits, setCredits] = useState(null);
+  const [userMenu, setUserMenu] = useState(false);
+
+  const signOut = async () => {
+    setUserMenu(false);
+    try { await api.post("/auth/logout"); } catch { /* session may already be gone */ }
+    await refreshMe(); // user → null re-renders the auth screen
+    nav("/overview");
+  };
 
   useEffect(() => {
     let live = true;
@@ -61,12 +69,12 @@ export function Shell({ children }) {
           <div className="test-banner">Metered preview — v0.2.0 testnet contract. Mainnet and production billing are disabled.</div>
         </>}
         <div className="topbar2">
-          <button className="org-btn">
+          {/* display-only: single-org preview — no switcher until orgs/teams land */}
+          <div className="org-btn" style={{ cursor: "default" }}>
             <span className="org-avatar">{initials}</span>
             <span style={{ fontSize: 13.5, fontWeight: 650 }}>{org?.name}</span>
             {account && <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{trunc(account.public_key)}</span>}
-            <Ic.chevron width={13} height={13} style={{ color: "var(--ink-3)" }} />
-          </button>
+          </div>
           <div style={{ flex: 1 }} />
           <div className="env-toggle">
             <span className={"env-opt" + (env === "test" ? " on-test" : "")} onClick={() => setEnv("test")}>TEST</span>
@@ -75,7 +83,17 @@ export function Shell({ children }) {
           <span className="credits-chip mono" style={env === "test" ? { color: "var(--ink-2)" } : undefined}>
             {env === "test" ? "testnet · free" : <><Ic.coins width={13} height={13} style={{ color: "var(--ink-2)" }} />testnet · {credits == null ? "…" : fmtCr(credits) + " cr"}</>}
           </span>
-          <span className="user-dot">{userInitials}</span>
+          <div style={{ position: "relative" }}>
+            <button className="user-dot" title={user?.email} onClick={() => setUserMenu((m) => !m)}
+              style={{ cursor: "pointer", border: "none", font: "inherit" }}>{userInitials}</button>
+            {userMenu && <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 90 }} onClick={() => setUserMenu(false)} />
+              <div className="card" style={{ position: "absolute", right: 0, top: "calc(100% + 8px)", zIndex: 91, minWidth: 230, padding: 6, boxShadow: "var(--shadow)" }}>
+                <div className="mono" style={{ padding: "9px 12px", fontSize: 12, color: "var(--ink-3)", borderBottom: "1px solid var(--line)", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.email}</div>
+                <button className="btn-plain" style={{ width: "100%", textAlign: "left", fontSize: 13.5, padding: "9px 12px" }} onClick={signOut}>Sign out</button>
+              </div>
+            </>}
+          </div>
         </div>
         {children}
       </div>

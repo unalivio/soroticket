@@ -4,6 +4,11 @@ import { useApp } from "../store.jsx";
 import { BtnPrimary, ErrText, Ic, Modal, Pill } from "../ui.jsx";
 import { Wizard } from "./Campaigns.jsx";
 
+// derive the real program status from its backing campaign (was hardcoded
+// "Active"): archived and expired programs reject new punches with 409.
+const programStatus = (p) =>
+  p.archived ? ["", "Archived"] : p.valid_until * 1000 < Date.now() ? ["pending", "Expired"] : ["valid", "Active"];
+
 function PunchDots({ n, of, size = 13 }) {
   const shown = Math.min(of, 10);
   return (
@@ -78,7 +83,7 @@ export function LoyaltyPage() {
               <PunchDots n={3} of={Math.min(p.threshold, 5)} size={9} />
               <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{p.threshold} punches → reward</span>
             </div>
-            <Pill kind="valid">Active</Pill>
+            {(([k, l]) => <Pill kind={k || undefined}>{l}</Pill>)(programStatus(p))}
             <span className="mono" style={{ fontSize: 13 }}>{p.customers}</span>
             <span className="mono" style={{ fontSize: 13 }}>{p.rewards_issued}</span>
             <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{fmtDate(p.created_at)}</span>
@@ -112,7 +117,7 @@ export function LoyaltyDetailPage({ id }) {
           <Ic.chevron width={12} height={12} style={{ transform: "rotate(-90deg)" }} />
           <span style={{ color: "var(--ink)" }}>{p.name}</span>
         </div>
-        <Pill kind="valid">Active</Pill>
+        {(([k, l]) => <Pill kind={k || undefined}>{l}</Pill>)(programStatus(p))}
         <BtnPrimary small icon={<Ic.plus width={13} height={13} />} onClick={() => setPunch(true)}>Record punches</BtnPrimary>
       </div>
 
