@@ -111,6 +111,14 @@ func (s *server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out["account_funded"] = funded == 1
+	// active key count lets the onboarding checklist complete its last step
+	var apiKeys int64
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM api_keys WHERE org_id = ? AND env = ? AND revoked_at IS NULL`,
+		a.OrgID, a.Env).Scan(&apiKeys); err != nil {
+		writeInternal(w, err, "count overview api keys")
+		return
+	}
+	out["api_keys"] = apiKeys
 	writeJSON(w, 200, out)
 }
 

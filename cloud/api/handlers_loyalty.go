@@ -145,10 +145,13 @@ func (s *server) handleListPrograms(w http.ResponseWriter, r *http.Request) {
 	// queries while iterating rows deadlocks (rows holds the only conn)
 	type progRow struct {
 		id, threshold, campID, rval, created int64
+		archived, validUntil                 int64
 		name, earn, rtype                    string
 	}
-	rows, err := s.db.Query(`SELECT id, name, threshold, campaign_id, earn_code, reward_discount_type,
-	  reward_discount_value, created_at FROM loyalty_programs WHERE org_id = ? AND env = ? ORDER BY id DESC`,
+	rows, err := s.db.Query(`SELECT lp.id, lp.name, lp.threshold, lp.campaign_id, lp.earn_code, lp.reward_discount_type,
+	  lp.reward_discount_value, lp.created_at, c.archived, c.valid_until
+	  FROM loyalty_programs lp JOIN campaigns c ON c.id = lp.campaign_id
+	  WHERE lp.org_id = ? AND lp.env = ? ORDER BY lp.id DESC`,
 		a.OrgID, a.Env)
 	if err != nil {
 		writeInternal(w, err, "list loyalty programs")
@@ -157,7 +160,7 @@ func (s *server) handleListPrograms(w http.ResponseWriter, r *http.Request) {
 	progs := []progRow{}
 	for rows.Next() {
 		var p progRow
-		if err := rows.Scan(&p.id, &p.name, &p.threshold, &p.campID, &p.earn, &p.rtype, &p.rval, &p.created); err != nil {
+		if err := rows.Scan(&p.id, &p.name, &p.threshold, &p.campID, &p.earn, &p.rtype, &p.rval, &p.created, &p.archived, &p.validUntil); err != nil {
 			rows.Close()
 			writeInternal(w, err, "decode loyalty program")
 			return
@@ -187,6 +190,7 @@ func (s *server) handleListPrograms(w http.ResponseWriter, r *http.Request) {
 			"id": p.id, "name": p.name, "threshold": p.threshold, "campaign_id": p.campID, "earn_code": p.earn,
 			"reward_discount_type": p.rtype, "reward_discount_value": p.rval, "created_at": p.created,
 			"punches": punches, "customers": customers, "rewards_issued": rewards, "rewards_redeemed": redeemed,
+			"archived": p.archived == 1, "valid_until": p.validUntil,
 		})
 	}
 	writeJSON(w, 200, map[string]any{"programs": out})
@@ -196,10 +200,12 @@ func (s *server) handleGetProgram(w http.ResponseWriter, r *http.Request) {
 	a := authFrom(r)
 	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	var name, earn, rtype string
-	var threshold, campID, rval, created int64
-	err := s.db.QueryRow(`SELECT name, threshold, campaign_id, earn_code, reward_discount_type,
-	  reward_discount_value, created_at FROM loyalty_programs WHERE id = ? AND org_id = ? AND env = ?`,
-		id, a.OrgID, a.Env).Scan(&name, &threshold, &campID, &earn, &rtype, &rval, &created)
+	var threshold, campID, rval, created, archived, validUntil int64
+	err := s.db.QueryRow(`SELECT lp.name, lp.threshold, lp.campaign_id, lp.earn_code, lp.reward_discount_type,
+	  lp.reward_discount_value, lp.created_at, c.archived, c.valid_until
+	  FROM loyalty_programs lp JOIN campaigns c ON c.id = lp.campaign_id
+	  WHERE lp.id = ? AND lp.org_id = ? AND lp.env = ?`,
+		id, a.OrgID, a.Env).Scan(&name, &threshold, &campID, &earn, &rtype, &rval, &created, &archived, &validUntil)
 	if err != nil {
 		writeProblem(w, 404, "program not found")
 		return
@@ -292,6 +298,7 @@ func (s *server) handleGetProgram(w http.ResponseWriter, r *http.Request) {
 		"reward_discount_type": rtype, "reward_discount_value": rval, "created_at": created,
 		"punches": punches, "customers": custCount, "rewards_issued": rwCount, "rewards_redeemed": rwRedeemed,
 		"pending_anchor_events": pendingEvents,
+		"archived": archived == 1, "valid_until": validUntil,
 	}, "customers": customers, "rewards": rewards})
 }
 
@@ -404,7 +411,7 @@ func (s *server) handlePunch(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 400, "this punch would issue more than 100 rewards; split it into smaller requests")
 		return
 	}
-	receipt, err := s.signReceipt(a.OrgID, a.Env, chainID, earn, count, ref, eventRef, now)
+	receipt, err := s.signReceipt(a.OrgID, a.Env, chainID, earn, count, ref, eventRef, now, receiptEvidence{})
 	if err != nil {
 		writeProblem(w, 500, "could not sign loyalty receipt")
 		return

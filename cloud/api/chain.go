@@ -28,6 +28,10 @@ import (
 // (2026-07-12; see deployments/testnet-v0.2.0.json).
 const currentContractID = "CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF"
 
+// cloudNetwork names the Stellar network every Cloud environment runs on.
+// Receipts embed it (v2) so a receipt can never be confused across networks.
+const cloudNetwork = "testnet"
+
 // legacyContractID is the deprecated v0.1 deployment. Rows stamped with it (or
 // with an empty/unknown stamp) fail closed on chain operations: v0.2 restarts
 // campaign numbering, so a legacy chain_id resolved on the current contract

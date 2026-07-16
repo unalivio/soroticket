@@ -221,11 +221,11 @@ func TestSignedReceiptsAndMerkleProofs(t *testing.T) {
 	if commitment == s.opaqueRef("other", "customer@example.com") || len(commitment) != 64 {
 		t.Fatal("opaque references must be domain-separated full HMACs")
 	}
-	r1, err := s.signReceipt(7, "test", 42, "SAVE", 1, commitment, "", 100)
+	r1, err := s.signReceipt(7, "test", 42, "SAVE", 1, commitment, "", 100, receiptEvidence{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	r2, err := s.signReceipt(7, "test", 42, "SAVE", 2, commitment, "", 101)
+	r2, err := s.signReceipt(7, "test", 42, "SAVE", 2, commitment, "", 101, receiptEvidence{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +273,7 @@ func TestPublicTallyAuditRejectsPayloadLeafMismatch(t *testing.T) {
 	if _, err := s.db.Exec(`INSERT INTO shared_codes (id,campaign_id,code,payout_rate,created_at) VALUES (1,1,'SAVE','0',100)`); err != nil {
 		t.Fatal(err)
 	}
-	receipt, err := s.signReceipt(7, "test", 42, "SAVE", 2, "", "", 100)
+	receipt, err := s.signReceipt(7, "test", 42, "SAVE", 2, "", "", 100, receiptEvidence{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,6 +311,118 @@ func TestPublicTallyAuditRejectsPayloadLeafMismatch(t *testing.T) {
 	}
 }
 
+func TestReceiptV2CarriesDeploymentIdentityAndEvidence(t *testing.T) {
+	s := testServer(t)
+	if _, err := s.db.Exec(`INSERT INTO orgs (id,name,created_at) VALUES (7,'test',0)`); err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := s.signReceipt(7, "test", 42, "SAVE", 1, "cust", "order", 100,
+		receiptEvidence{Type: "whatsapp_scan", ContextHash: "abc123", PolicyVersion: "v3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p receiptPayload
+	if err := json.Unmarshal(receipt.Payload, &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.Version != 2 || p.Network != cloudNetwork || p.ContractID != currentContractID {
+		t.Fatalf("receipt lacks deployment identity: %+v", p)
+	}
+	if p.EvidenceType != "whatsapp_scan" || p.ContextHash != "abc123" || p.PolicyVersion != "v3" {
+		t.Fatalf("integrator evidence was not embedded: %+v", p)
+	}
+	// empty evidence must not leak empty keys into the canonical payload
+	bare, err := s.signReceipt(7, "test", 42, "SAVE", 1, "", "", 100, receiptEvidence{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(bare.Payload), "evidence_type") || strings.Contains(string(bare.Payload), "context_hash") {
+		t.Fatalf("empty evidence fields serialized: %s", bare.Payload)
+	}
+}
+
+func TestPublicTallyAuditIsScopedByContractDeployment(t *testing.T) {
+	s := testServer(t)
+	if _, err := s.db.Exec(`INSERT INTO orgs (id,name,created_at) VALUES (7,'test',0)`); err != nil {
+		t.Fatal(err)
+	}
+	// Two deployments share chain_id 42 + code SAVE + period 202601: the old
+	// contract's tally (quarantined, no signed receipts) and the current one.
+	if _, err := s.db.Exec(`INSERT INTO campaigns
+	  (id,org_id,env,chain_id,contract_id,kind,name,discount_type,discount_value,total_supply,valid_until,created_at)
+	  VALUES (1,7,'test',42,'`+legacyContractID+`','coupon','Old','percentage',1000,100,9999999999,100),
+	         (2,7,'test',42,'`+currentContractID+`','coupon','New','percentage',1000,100,9999999999,100)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO shared_codes (id,campaign_id,code,payout_rate,created_at)
+	  VALUES (1,1,'SAVE','0',100),(2,2,'SAVE','0',100)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO tallies (shared_code_id,period,count,merkle_root,committed_at)
+	  VALUES (1,202601,5,'00',100)`); err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := s.signReceipt(7, "test", 42, "SAVE", 2, "", "", 100, receiptEvidence{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := hexRoot(merkleRoot([][32]byte{receipt.Leaf}))
+	if _, err = s.db.Exec(`INSERT INTO shared_events (id,shared_code_id,count,committed_period,created_at) VALUES (1,2,2,202601,100)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.db.Exec(`INSERT INTO event_receipts (event_id,payload,leaf_hash,signature,signer) VALUES (1,?,?,?,?)`,
+		receipt.Payload, hexRoot(receipt.Leaf), receipt.Signature, receipt.Signer); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.db.Exec(`INSERT INTO tallies (shared_code_id,period,count,merkle_root,committed_at) VALUES (2,202601,2,?,100)`, root); err != nil {
+		t.Fatal(err)
+	}
+
+	request := func(contract string) *http.Request {
+		target := "/v1/audit/tallies/42/SAVE/202601"
+		if contract != "" {
+			target += "?contract=" + contract
+		}
+		r := httptest.NewRequest(http.MethodGet, target, nil)
+		r.SetPathValue("chain_id", "42")
+		r.SetPathValue("code", "SAVE")
+		r.SetPathValue("period", "202601")
+		return r
+	}
+
+	// default: deterministic resolution to the CURRENT deployment
+	w := httptest.NewRecorder()
+	s.handleAuditTally(w, request(""))
+	if w.Code != http.StatusOK {
+		t.Fatalf("default audit status=%d body=%s", w.Code, w.Body.String())
+	}
+	var out struct {
+		ContractID string `json:"contract_id"`
+		Network    string `json:"network"`
+		MerkleRoot string `json:"merkle_root"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ContractID != currentContractID || out.Network != cloudNetwork || out.MerkleRoot != root {
+		t.Fatalf("default audit resolved ambiguously: %+v", out)
+	}
+
+	// explicit legacy: its quarantined tally has no signed receipt set → 410
+	legacy := httptest.NewRecorder()
+	s.handleAuditTally(legacy, request(legacyContractID))
+	if legacy.Code != http.StatusGone {
+		t.Fatalf("legacy audit status=%d body=%s", legacy.Code, legacy.Body.String())
+	}
+
+	// unknown deployment → 404
+	unknown := httptest.NewRecorder()
+	s.handleAuditTally(unknown, request("CUNKNOWNDEPLOYMENT"))
+	if unknown.Code != http.StatusNotFound {
+		t.Fatalf("unknown contract status=%d body=%s", unknown.Code, unknown.Body.String())
+	}
+}
+
 func TestPublicTallyAuditIsPaginatedWithReusableMerkleLevels(t *testing.T) {
 	s := testServer(t)
 	if _, err := s.db.Exec(`INSERT INTO orgs (id,name,created_at) VALUES (7,'test',0)`); err != nil {
@@ -327,7 +439,7 @@ func TestPublicTallyAuditIsPaginatedWithReusableMerkleLevels(t *testing.T) {
 
 	leaves := make([][32]byte, 0, 3)
 	for i := int64(1); i <= 3; i++ {
-		receipt, err := s.signReceipt(7, "test", 42, "SAVE", 1, "", "", 100+i)
+		receipt, err := s.signReceipt(7, "test", 42, "SAVE", 1, "", "", 100+i, receiptEvidence{})
 		if err != nil {
 			t.Fatal(err)
 		}

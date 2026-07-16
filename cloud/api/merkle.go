@@ -55,16 +55,35 @@ func merkleParent(left, right [32]byte) [32]byte {
 
 func hexRoot(r [32]byte) string { return hex.EncodeToString(r[:]) }
 
+// receiptPayload is the canonical signed receipt. Version 2 adds the network
+// and contract deployment (so a receipt is unambiguous across deployments)
+// plus optional integrator-declared evidence metadata. Version 1 receipts
+// remain stored and verifiable exactly as issued.
 type receiptPayload struct {
 	Version            int    `json:"version"`
+	Network            string `json:"network,omitempty"`     // v2
+	ContractID         string `json:"contract_id,omitempty"` // v2
 	CampaignID         uint64 `json:"campaign_id"`
 	Code               string `json:"code"`
 	Count              int64  `json:"count"`
 	CustomerCommitment string `json:"customer_commitment,omitempty"`
 	OrderCommitment    string `json:"order_commitment,omitempty"`
+	EvidenceType       string `json:"evidence_type,omitempty"`  // v2, integrator-declared
+	ContextHash        string `json:"context_hash,omitempty"`   // v2, opaque integrator hash
+	PolicyVersion      string `json:"policy_version,omitempty"` // v2, integrator-declared
 	Timestamp          int64  `json:"timestamp"`
 	Nonce              string `json:"nonce"`
 	Signer             string `json:"signer"`
+}
+
+// receiptEvidence is optional integrator-declared metadata embedded in the
+// signed payload. Cloud does not interpret it: it binds the integrator's own
+// evidence policy (e.g. "whatsapp_scan" under policy v3 with a context hash)
+// to the attestation, per docs/USE_CASES.md.
+type receiptEvidence struct {
+	Type          string
+	ContextHash   string
+	PolicyVersion string
 }
 
 type signedReceipt struct {
@@ -102,7 +121,7 @@ func legacyCustomerReference(programID int64, ref string) string {
 	return hex.EncodeToString(h[:8])
 }
 
-func (s *server) signReceipt(orgID int64, env string, campaignID uint64, code string, count int64, customerCommitment, orderCommitment string, timestamp int64) (signedReceipt, error) {
+func (s *server) signReceipt(orgID int64, env string, campaignID uint64, code string, count int64, customerCommitment, orderCommitment string, timestamp int64, evidence receiptEvidence) (signedReceipt, error) {
 	signer, err := s.receiptSigner(orgID, env)
 	if err != nil {
 		return signedReceipt{}, err
@@ -112,12 +131,17 @@ func (s *server) signReceipt(orgID int64, env string, campaignID uint64, code st
 		return signedReceipt{}, err
 	}
 	p := receiptPayload{
-		Version:            1,
+		Version:            2,
+		Network:            cloudNetwork,
+		ContractID:         currentContractID,
 		CampaignID:         campaignID,
 		Code:               code,
 		Count:              count,
 		CustomerCommitment: customerCommitment,
 		OrderCommitment:    orderCommitment,
+		EvidenceType:       evidence.Type,
+		ContextHash:        evidence.ContextHash,
+		PolicyVersion:      evidence.PolicyVersion,
 		Timestamp:          timestamp,
 		Nonce:              nonce,
 		Signer:             signer.Address(),
@@ -178,3 +202,13 @@ func decodeHash(value string) ([32]byte, error) {
 type hashLengthError struct{ got int }
 
 func (e *hashLengthError) Error() string { return "hash must be 32 bytes, got " + strconv.Itoa(e.got) }
+
+// isLowerHex reports whether s contains only lowercase hex characters.
+func isLowerHex(s string) bool {
+	for _, c := range s {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
+}

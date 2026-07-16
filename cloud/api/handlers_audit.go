@@ -36,6 +36,17 @@ func (s *server) handleAuditTally(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 400, "invalid shared code")
 		return
 	}
+	// chain_id+code+period alone is ambiguous across contract deployments
+	// (numbering restarts). Default to the current deployment; the deprecated
+	// one stays reachable explicitly for historical audits.
+	auditContract := currentContractID
+	if raw := strings.TrimSpace(r.URL.Query().Get("contract")); raw != "" {
+		if raw != currentContractID && raw != legacyContractID {
+			writeProblem(w, 404, "unknown contract deployment")
+			return
+		}
+		auditContract = raw
+	}
 	cursor := int64(0)
 	if raw := r.URL.Query().Get("cursor"); raw != "" {
 		cursor, err = strconv.ParseInt(raw, 10, 64)
@@ -60,7 +71,8 @@ func (s *server) handleAuditTally(w http.ResponseWriter, r *http.Request) {
 	  FROM tallies t
 	  JOIN shared_codes sc ON sc.id = t.shared_code_id
 	  JOIN campaigns c ON c.id = sc.campaign_id
-	  WHERE c.chain_id = ? AND sc.code = ? AND t.period = ?`, chainID, code, period).
+	  WHERE c.chain_id = ? AND sc.code = ? AND t.period = ? AND c.contract_id = ?`,
+		chainID, code, period, auditContract).
 		Scan(&sharedID, &count, &root, &committedAt)
 	if err != nil {
 		writeProblem(w, 404, "committed tally not found")
@@ -180,9 +192,11 @@ func (s *server) handleAuditTally(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var payload receiptPayload
-		if err := json.Unmarshal(sr.payload, &payload); err != nil || payload.Version != 1 ||
+		if err := json.Unmarshal(sr.payload, &payload); err != nil ||
+			(payload.Version != 1 && payload.Version != 2) ||
 			payload.CampaignID != chainID || payload.Code != code || payload.Count <= 0 ||
-			payload.Count != sr.count || payload.Signer != sr.signer {
+			payload.Count != sr.count || payload.Signer != sr.signer ||
+			(payload.Version == 2 && (payload.Network != cloudNetwork || payload.ContractID != auditContract)) {
 			rows.Close()
 			writeProblem(w, 500, "stored receipt payload is inconsistent")
 			return
@@ -224,6 +238,7 @@ func (s *server) handleAuditTally(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	writeJSON(w, 200, map[string]any{
+		"network": cloudNetwork, "contract_id": auditContract,
 		"campaign_id": chainID, "code": code, "period": period,
 		"count": count, "merkle_root": root, "committed_at": committedAt,
 		"receipt_total": receiptTotal, "cursor": cursor, "limit": limit,

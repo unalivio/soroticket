@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	sd "github.com/sorodeal/sorodeal-go"
 )
 
 // isoWeekPeriod encodes an ISO week as YYYYWW (e.g. 202628). If one week needs
@@ -214,6 +216,11 @@ func (s *server) handleRecordEvents(w http.ResponseWriter, r *http.Request) {
 		Count       *int64 `json:"count"`
 		CustomerRef string `json:"customer_ref"`
 		OrderRef    string `json:"order_ref"`
+		// Optional integrator-declared evidence metadata, embedded verbatim in
+		// the signed receipt (v2). Cloud does not interpret these fields.
+		EvidenceType  string `json:"evidence_type"`
+		ContextHash   string `json:"context_hash"`
+		PolicyVersion string `json:"policy_version"`
 	}
 	if err := readBody(r, &in); err != nil {
 		writeProblem(w, 400, err.Error())
@@ -235,11 +242,23 @@ func (s *server) handleRecordEvents(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 400, "customer_ref and order_ref must not exceed 512 bytes")
 		return
 	}
+	in.EvidenceType = strings.TrimSpace(in.EvidenceType)
+	in.PolicyVersion = strings.TrimSpace(in.PolicyVersion)
+	in.ContextHash = strings.ToLower(strings.TrimSpace(in.ContextHash))
+	if len(in.EvidenceType) > 32 || len(in.PolicyVersion) > 32 {
+		writeProblem(w, 400, "evidence_type and policy_version must not exceed 32 bytes")
+		return
+	}
+	if in.ContextHash != "" && (len(in.ContextHash) > 64 || !isLowerHex(in.ContextHash)) {
+		writeProblem(w, 400, "context_hash must be lowercase hex of at most 64 characters")
+		return
+	}
 	domain := fmt.Sprintf("org:%d|env:%s|campaign:%d|code:%s", a.OrgID, a.Env, chainID, code)
 	custRef := s.opaqueRef(domain+"|customer", strings.TrimSpace(in.CustomerRef))
 	orderRef := s.opaqueRef(domain+"|order", strings.TrimSpace(in.OrderRef))
 	now := time.Now().Unix()
-	receipt, err := s.signReceipt(a.OrgID, a.Env, chainID, code, count, custRef, orderRef, now)
+	receipt, err := s.signReceipt(a.OrgID, a.Env, chainID, code, count, custRef, orderRef, now,
+		receiptEvidence{Type: in.EvidenceType, ContextHash: in.ContextHash, PolicyVersion: in.PolicyVersion})
 	if err != nil {
 		writeProblem(w, 500, "could not sign redemption receipt")
 		return
@@ -565,6 +584,15 @@ func (s *server) handleSettle(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusConflict, "settlement is not configured for this code")
 		return
 	}
+	// Settlement is permissionless on v0.2 and allowances are per owner+token,
+	// not per period — an external keeper may already have paid this period.
+	// Reconcile from chain truth instead of spending another approval.
+	if alreadySettled, err := cl.IsSettled(r.Context(), chainID, code, in.Period); err == nil && alreadySettled {
+		s.reconcileExternalSettlement(a, sharedID, in.Period, campName, code)
+		writeProblem(w, http.StatusConflict,
+			"this period is already settled on-chain (possibly by a third-party keeper); local records were reconciled")
+		return
+	}
 	// v0.2 settlement is allowance-based (checks-effects-interactions,
 	// keeper-triggerable). The capability gate: approve EXACTLY this period's
 	// payout immediately before settling, so no standing spend authority is
@@ -593,6 +621,15 @@ func (s *server) handleSettle(w http.ResponseWriter, r *http.Request) {
 	}
 	payouts, err := cl.Settle(r.Context(), chainID, code, in.Period)
 	if err != nil {
+		// A keeper may win the race between our approval and settlement. The
+		// exact-amount allowance we granted expires on its own; reflect the
+		// on-chain truth instead of surfacing a spurious failure.
+		if errCode, ok := contractCodeOf(err); ok && errCode == int(sd.ErrAlreadySettled) {
+			s.reconcileExternalSettlement(a, sharedID, in.Period, campName, code)
+			writeProblem(w, http.StatusConflict,
+				"a keeper settled this period between approval and settlement; local records were reconciled and the unused exact allowance expires on its own")
+			return
+		}
 		writeErr(w, err)
 		return
 	}
@@ -610,6 +647,22 @@ func (s *server) handleSettle(w http.ResponseWriter, r *http.Request) {
 	s.logActivity(a, "settle", code,
 		fmt.Sprintf("Settled %s · %s → %s %s", periodLabel(in.Period), campName, formatUnits(total), payoutUnit), txHash, &in.CampaignID, 0)
 	writeJSON(w, 201, map[string]any{"payouts": outs, "total": total.String(), "unit": payoutUnit, "tx_hash": txHash})
+}
+
+// reconcileExternalSettlement records that a period was settled on-chain by a
+// transaction Cloud did not submit (settlement is permissionless). The settle
+// transaction hash is unknown here and stays empty — it is never fabricated.
+func (s *server) reconcileExternalSettlement(a *authCtx, sharedID int64, period uint64, campName, code string) {
+	res, err := s.db.Exec(`UPDATE tallies SET settled = 1, settled_at = ?
+	  WHERE shared_code_id = ? AND period = ? AND settled = 0`, time.Now().Unix(), sharedID, period)
+	if err != nil {
+		log.Printf("reconcile external settlement shared=%d period=%d: %v", sharedID, period, err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		s.logActivity(a, "settle", code,
+			fmt.Sprintf("Settled externally %s · %s — reconciled from chain", periodLabel(period), campName), "", nil, 0)
+	}
 }
 
 // formatUnits renders token base-units (stroops, 1e7/unit) as a decimal amount.
