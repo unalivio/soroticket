@@ -1,5 +1,5 @@
 /**
- * @sorodeal/sdk — low-level browser client (Freighter signing).
+ * @soroticket/sdk — low-level browser client (Freighter signing).
  *
  * This is a hand-written client over raw ScVal encoding + Soroban RPC. Unlike
  * the generated typed `Client` (see ./contract), it surfaces the *contract
@@ -9,7 +9,7 @@
  * simulation errors — hence this client exists for the playground / browser
  * dapps that need precise per-error UX.
  *
- * For server-side or strongly-typed use, prefer `sorodeal()` (the typed
+ * For server-side or strongly-typed use, prefer `soroticket()` (the typed
  * `Client`) from ./helpers.
  */
 import * as StellarTyped from "@stellar/stellar-sdk";

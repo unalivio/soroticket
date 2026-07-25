@@ -9,7 +9,7 @@ import (
 	"mime"
 	"net/http"
 
-	sd "github.com/sorodeal/sorodeal-go"
+	sd "github.com/soroticket/soroticket-go"
 )
 
 // friendlyErr maps contract error codes to merchant-readable copy. The numeric

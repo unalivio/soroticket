@@ -112,7 +112,9 @@ func opaqueReference(key []byte, domain, ref string) string {
 // an existing loyalty balance can be moved to its new HMAC identity when that
 // customer next appears. It must never be used for new storage. The pre-audit
 // loyalty domain was program-scoped: sha256("sorodeal-loyalty|{programID}|{ref}")
-// (the "sorodeal-cust|" domain belonged to tally events, not loyalty).
+// (the "sorodeal-cust|" domain belonged to tally events, not loyalty). These
+// literals keep the project's FORMER name on purpose: they reproduce hashes
+// that were written to disk before the Soroticket rename and must never change.
 func legacyCustomerReference(programID int64, ref string) string {
 	if ref == "" {
 		return ""

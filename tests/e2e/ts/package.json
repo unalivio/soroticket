@@ -1,12 +1,12 @@
 {
-  "name": "sorodeal-e2e-ts",
+  "name": "soroticket-e2e-ts",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Consumer E2E tester for @sorodeal/sdk against Stellar testnet.",
+  "description": "Consumer E2E tester for @soroticket/sdk against Stellar testnet.",
   "scripts": { "e2e": "node e2e.mjs" },
   "dependencies": {
-    "@sorodeal/sdk": "file:../../../sdk/ts",
+    "@soroticket/sdk": "file:../../../sdk/ts",
     "@stellar/stellar-sdk": "^16.0.1"
   }
 }

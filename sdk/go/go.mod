@@ -1,4 +1,4 @@
-module github.com/sorodeal/sorodeal-go
+module github.com/soroticket/soroticket-go
 
 go 1.25.12
 

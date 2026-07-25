@@ -648,9 +648,9 @@ func TestWebhookDeliveryIsSignedOverTimestampAndRawBody(t *testing.T) {
 	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		body, _ := io.ReadAll(r.Body)
 		got <- received{
-			body: body, timestamp: r.Header.Get("X-Sorodeal-Timestamp"),
-			signature: r.Header.Get("X-Sorodeal-Signature"),
-			delivery:  r.Header.Get("X-Sorodeal-Delivery"), event: r.Header.Get("X-Sorodeal-Event"),
+			body: body, timestamp: r.Header.Get("X-Soroticket-Timestamp"),
+			signature: r.Header.Get("X-Soroticket-Signature"),
+			delivery:  r.Header.Get("X-Soroticket-Delivery"), event: r.Header.Get("X-Soroticket-Event"),
 		}
 		return &http.Response{
 			StatusCode: http.StatusNoContent,
@@ -661,7 +661,7 @@ func TestWebhookDeliveryIsSignedOverTimestampAndRawBody(t *testing.T) {
 
 	payload := []byte(`{"id":"whd_test","type":"redemption.created"}`)
 	secret := []byte("whsec_test_secret")
-	status, err := sendWebhook(context.Background(), client, "https://webhook.example.test/sorodeal", secret,
+	status, err := sendWebhook(context.Background(), client, "https://webhook.example.test/soroticket", secret,
 		"whd_test", "redemption.created", payload)
 	if err != nil || status != http.StatusNoContent {
 		t.Fatalf("send status=%d err=%v", status, err)

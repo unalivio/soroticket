@@ -1,4 +1,4 @@
-// Package sorodeal is the Go SDK for the Sorodeal coupon protocol on Stellar
+// Package soroticket is the Go SDK for the Soroticket coupon protocol on Stellar
 // Soroban — the Burn profile (unique single-use codes) and the Tally profile
 // (shared codes + optional SAC token settlement).
 //
@@ -7,7 +7,7 @@
 // assembles (footprint + resource fee + auth), signs, and submits with retries
 // and idempotent re-submission keyed on the transaction hash (so a network
 // retry cannot submit a different transaction for the same signed envelope.
-package sorodeal
+package soroticket
 
 import (
 	"context"
@@ -57,7 +57,7 @@ type Config struct {
 	ReadSource        string        // optional source account for read sims
 }
 
-// Client invokes the Sorodeal coupon-ledger contract. It is bound to at most one
+// Client invokes the Soroticket coupon-ledger contract. It is bound to at most one
 // signing identity (Config.Signer); construct several Clients for several actors
 // (owner, delegate, …). Safe for sequential use; not designed for concurrent
 // writes from one Client (sequence numbers are loaded per call).

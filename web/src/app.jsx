@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — app root + Tweaks
+   Soroticket Playground — app root + Tweaks
    ═══════════════════════════════════════════════════════════════════ */
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{

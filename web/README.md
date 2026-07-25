@@ -1,6 +1,6 @@
-# Sorodeal Playground (web)
+# Soroticket Playground (web)
 
-Interactive developer playground for the Sorodeal coupon protocol, signing with
+Interactive developer playground for the Soroticket coupon protocol, signing with
 Freighter on Stellar testnet.
 
 > It calls the real **v0.2.0 testnet** deployment (2026-07-12). Testnet
@@ -9,7 +9,7 @@ Freighter on Stellar testnet.
 
 ## Run
 
-The playground consumes the local `@sorodeal/sdk` package (wired via
+The playground consumes the local `@soroticket/sdk` package (wired via
 `file:../sdk/ts`), so build the SDK first:
 
 ```bash
@@ -53,11 +53,11 @@ npm run preview
 
 ## Architecture
 
-A design export (React, authored for Babel-in-browser with global symbols) runs under Vite via a small globals bridge (`src/globals.js`) so the design files are preserved verbatim. The only rewritten file is `src/store.jsx`, which calls the real Soroban layer. That layer lives **once** in `@sorodeal/sdk` (`freighterClient`); `src/lib/soroban.js` is a thin bridge that binds it to `SD.NET` and exposes `window.SDK`. Network constants live in `src/data.js` (`SD.NET`).
+A design export (React, authored for Babel-in-browser with global symbols) runs under Vite via a small globals bridge (`src/globals.js`) so the design files are preserved verbatim. The only rewritten file is `src/store.jsx`, which calls the real Soroban layer. That layer lives **once** in `@soroticket/sdk` (`freighterClient`); `src/lib/soroban.js` is a thin bridge that binds it to `SD.NET` and exposes `window.SDK`. Network constants live in `src/data.js` (`SD.NET`).
 
 | File | Role |
 |---|---|
-| `src/lib/soroban.js` | Thin bridge: binds `@sorodeal/sdk`'s `freighterClient` to `SD.NET` → `window.SDK` |
+| `src/lib/soroban.js` | Thin bridge: binds `@soroticket/sdk`'s `freighterClient` to `SD.NET` → `window.SDK` |
 | `src/store.jsx` | App state + contract calls (context API) → `window.useApp` |
 | `src/data.js` | Testnet constants, error map, CLI/TS/Go snippet generators |
 | `src/*.jsx`, `src/*.css` | Design export (UI), unchanged |

@@ -1,4 +1,4 @@
-# Sorodeal Protocol Spec (v0.2)
+# Soroticket Protocol Spec (v0.2)
 
 > v0.2.0 implements Burn and Tally and is deployed to **testnet** at
 > `CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF`
@@ -8,7 +8,7 @@
 
 ## 1. Scope and trust model
 
-Sorodeal standardizes a permissionless Soroban primitive for unique redeemable
+Soroticket standardizes a permissionless Soroban primitive for unique redeemable
 codes and shared promotion codes:
 
 ```text
@@ -144,8 +144,8 @@ guarantee.
 
 At registration, token and rate become immutable. Before settlement, the owner
 uses the payout token contract's standard `approve` function to authorize the
-Sorodeal contract address as spender for a bounded amount and expiration
-ledger. This approval is outside the Sorodeal ABI.
+Soroticket contract address as spender for a bounded amount and expiration
+ledger. This approval is outside the Soroticket ABI.
 
 Anyone may then call `settle(owner, campaign_id, code, period)` and pay the
 transaction fee. The contract:
@@ -160,7 +160,7 @@ Soroban atomicity rolls step 4 back if a token call fails. Re-entry cannot
 settle the same period twice. Owners should approve only the expected amount
 and a short expiration, and revoke unused allowance.
 
-## 5. Receipt profile used by Sorodeal Cloud
+## 5. Receipt profile used by Soroticket Cloud
 
 The core contract accepts any 32-byte Merkle root; receipt serialization is an
 integration profile. Cloud v1 uses canonical `encoding/json` output with fields

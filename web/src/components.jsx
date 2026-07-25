@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — shared primitives + icons  → window
+   Soroticket Playground — shared primitives + icons  → window
    ═══════════════════════════════════════════════════════════════════ */
 const { useState, useEffect, useRef, useCallback, createContext, useContext } = React;
 

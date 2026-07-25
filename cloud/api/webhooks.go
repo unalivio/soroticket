@@ -159,11 +159,11 @@ func sendWebhook(ctx context.Context, client *http.Client, endpoint string, secr
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Sorodeal-Webhooks/1.0")
-	req.Header.Set("X-Sorodeal-Delivery", deliveryID)
-	req.Header.Set("X-Sorodeal-Event", eventType)
-	req.Header.Set("X-Sorodeal-Timestamp", timestamp)
-	req.Header.Set("X-Sorodeal-Signature", webhookSignature(secret, timestamp, payload))
+	req.Header.Set("User-Agent", "Soroticket-Webhooks/1.0")
+	req.Header.Set("X-Soroticket-Delivery", deliveryID)
+	req.Header.Set("X-Soroticket-Event", eventType)
+	req.Header.Set("X-Soroticket-Timestamp", timestamp)
+	req.Header.Set("X-Soroticket-Signature", webhookSignature(secret, timestamp, payload))
 	resp, err := client.Do(req)
 	if err != nil {
 		return 0, err
@@ -331,7 +331,7 @@ func (s *server) handleTestWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	deliveryID, err := s.queueWebhook(id, "endpoint.test", map[string]any{
-		"object": "webhook_test", "message": "Sorodeal webhook delivery is working.",
+		"object": "webhook_test", "message": "Soroticket webhook delivery is working.",
 	}, a.Env)
 	if err != nil {
 		writeInternal(w, err, "queue test webhook")

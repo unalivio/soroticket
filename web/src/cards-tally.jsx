@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — Tally profile (shared codes) · ADR-003/004/011
+   Soroticket Playground — Tally profile (shared codes) · ADR-003/004/011
    Register a shared code (with a FIXED settlement token + rate) → commit
    periodic on-chain tallies (count + merkle_root + per-attribution) →
    audit / compute payouts / settle. Token + rate are immutable from

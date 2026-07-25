@@ -292,7 +292,7 @@ export function Wizard({ onDone, fixedKind }) {
                     )}
                     <div style={{ background: "var(--pending-bg)", border: "1px solid color-mix(in oklch, var(--pending) 26%, transparent)", borderRadius: 12, padding: "13px 15px", display: "flex", gap: 11 }}>
                       <Ic.lock width={17} height={17} style={{ flex: "none", marginTop: 1, color: "var(--pending)" }} />
-                      <p style={{ fontSize: 13, color: "var(--pending)", lineHeight: 1.5, margin: 0 }}><strong>Scans prove attestation, not consumption.</strong> Signed receipts and the anchored tally make the scan set tamper-evident; detecting abuse (one phone scanning everything) is your integration's job — Sorodeal gives you the customer commitments to do it.</p>
+                      <p style={{ fontSize: 13, color: "var(--pending)", lineHeight: 1.5, margin: 0 }}><strong>Scans prove attestation, not consumption.</strong> Signed receipts and the anchored tally make the scan set tamper-evident; detecting abuse (one phone scanning everything) is your integration's job — Soroticket gives you the customer commitments to do it.</p>
                     </div>
                   </>}
                 </>}

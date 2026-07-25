@@ -18,7 +18,7 @@ import (
 
 	"github.com/stellar/go-stellar-sdk/keypair"
 
-	sd "github.com/sorodeal/sorodeal-go"
+	sd "github.com/soroticket/soroticket-go"
 )
 
 // v1 runs both environments against the Stellar testnet contract: "test" is
@@ -94,7 +94,7 @@ func loadOrCreateReferenceKey(dir string, kek []byte) ([]byte, error) {
 		return nil, fmt.Errorf("read reference key: %w", err)
 	}
 	mac := hmac.New(sha256.New, kek)
-	_, _ = mac.Write([]byte("sorodeal/reference-key/v1"))
+	_, _ = mac.Write([]byte("soroticket/reference-key/v1"))
 	b := mac.Sum(nil)
 	if err := writeSecretFile(p, b); err != nil {
 		return nil, err
@@ -234,7 +234,7 @@ func (s *server) fundAccount(orgID int64, env, addr string) {
 	}
 }
 
-// clientFor builds a sorodeal client signing as the org's custodial account.
+// clientFor builds a soroticket client signing as the org's custodial account.
 // Writes per org+env are serialized (sequence numbers) via a per-account mutex.
 func (s *server) clientFor(orgID int64, env string) (*sd.Client, func(), error) {
 	var pk string

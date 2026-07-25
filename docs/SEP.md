@@ -1,4 +1,4 @@
-# SEP-XXXX — Tokenized Coupons, Vouchers & Redeemable Codes (Sorodeal)
+# SEP-XXXX — Tokenized Coupons, Vouchers & Redeemable Codes (Soroticket)
 
 > **Candidate / Draft.** This is a pre-submission draft of a Stellar Ecosystem
 > Proposal. It synthesizes the reference implementation in this repository
@@ -17,7 +17,7 @@ Status: Draft
 Created: 2026-05-31
 Version: 0.2.0-draft
 Discussion: <fill-in: GitHub discussion / Stellar Dev Discord thread>
-Reference implementation: https://github.com/<org>/sorodeal
+Reference implementation: https://github.com/<org>/soroticket
   (ABI: contracts/coupon-ledger/abi-v0.2.0.txt; testnet:
   CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF)
 ```
@@ -175,7 +175,7 @@ compute_payouts(campaign_id, code, period) -> Vec<Payout>     // public, read-on
 settle(owner, campaign_id, code, period) -> Vec<Payout>       // public trigger; pays once per period
 ```
 
-Before settlement, the owner approves the Sorodeal contract as spender through
+Before settlement, the owner approves the Soroticket contract as spender through
 the payout token's standard `approve` interface for a bounded amount and ledger
 expiration. Any fee payer may then call `settle`. The contract checks allowance
 and balance, marks the period settled before external token calls, and uses

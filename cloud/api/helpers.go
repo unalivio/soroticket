@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	sd "github.com/sorodeal/sorodeal-go"
+	sd "github.com/soroticket/soroticket-go"
 	"github.com/stellar/go-stellar-sdk/strkey"
 	"github.com/stellar/go-stellar-sdk/xdr"
 )

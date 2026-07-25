@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — data layer (plain JS, attached to window.SD)
+   Soroticket Playground — data layer (plain JS, attached to window.SD)
    Testnet constants, empty UI state, snippet generators.
    Mirrors contracts/coupon-ledger/src/lib.rs (Burn profile).
    ═══════════════════════════════════════════════════════════════════ */
@@ -120,7 +120,7 @@
       `  rpc, Networks, BASE_FEE,`,
       `} from "@stellar/stellar-sdk";`,
       ``,
-      `const ownerKeypair = Keypair.fromSecret(process.env.SORODEAL_SECRET);`,
+      `const ownerKeypair = Keypair.fromSecret(process.env.SOROTICKET_SECRET);`,
       `const owner = ownerKeypair.publicKey();`,
       `const server = new rpc.Server("${NET.rpc}");`,
       `const contract = new Contract("${C}");`,
@@ -130,10 +130,10 @@
   }
   function goHeader() {
     return [
-      `// go get github.com/sorodeal/sorodeal-go`,
-      `kp := keypair.MustParseFull(os.Getenv("SORODEAL_SECRET"))`,
+      `// go get github.com/soroticket/soroticket-go`,
+      `kp := keypair.MustParseFull(os.Getenv("SOROTICKET_SECRET"))`,
       `// Testnet preset: current v0.2.0 testnet deployment.`,
-      `client, err := sorodeal.Testnet(kp)`,
+      `client, err := soroticket.Testnet(kp)`,
       `if err != nil { return err }`,
       `defer client.Close()`,
       ``,
@@ -267,7 +267,7 @@
 
       const go = goHeader() + [
         `// Randomized commitment — never plaintext PII on-chain (ADR-010).`,
-        `commitment, nonce, err := sorodeal.RedeemerCommitment(redeemerRef)`,
+        `commitment, nonce, err := soroticket.RedeemerCommitment(redeemerRef)`,
         `if err != nil { return err }`,
         `_ = nonce // store off-chain only if later proof is required`,
         ``,

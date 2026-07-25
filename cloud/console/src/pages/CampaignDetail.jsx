@@ -119,7 +119,7 @@ export function CampaignDetailPage({ id }) {
           <div style={{ flex: 1 }} />
           <button className="btn-plain" style={{ fontSize: 13 }} onClick={() => {
             const csv = "code,status,token_id,qr_payload\n" + data.codes.map((cd) =>
-              `${cd.code},${cd.status},${cd.token_id},"sorodeal:${c.chain_id}:${cd.code}"`).join("\n");
+              `${cd.code},${cd.status},${cd.token_id},"soroticket:${c.chain_id}:${cd.code}"`).join("\n");
             const a = document.createElement("a");
             a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
             a.download = `${c.name.replace(/\s+/g, "-")}-codes.csv`; a.click();
@@ -143,7 +143,7 @@ export function CampaignDetailPage({ id }) {
                   <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{fmtDate(cd.created_at)}</span>
                   <span style={{ fontSize: 12.5, color: cd.redeemed_at ? "var(--ink-2)" : "var(--ink-3)" }}>{cd.redeemed_at ? fmtDateTime(cd.redeemed_at) : "—"}</span>
                   <button title="Copy QR payload" style={{ justifySelf: "end", color: "var(--ink-3)" }}
-                    onClick={() => { navigator.clipboard?.writeText(`sorodeal:${c.chain_id}:${cd.code}`); toast("QR payload copied", `sorodeal:${c.chain_id}:${cd.code}`); }}>
+                    onClick={() => { navigator.clipboard?.writeText(`soroticket:${c.chain_id}:${cd.code}`); toast("QR payload copied", `soroticket:${c.chain_id}:${cd.code}`); }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16"><rect x="4" y="4" width="6" height="6" rx="1.2" /><rect x="14" y="4" width="6" height="6" rx="1.2" /><rect x="4" y="14" width="6" height="6" rx="1.2" /><path d="M14 14h2.6v2.6H14zM17.4 17.4H20V20h-2.6z" /></svg>
                   </button>
                 </div>

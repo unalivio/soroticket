@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — Create Campaign · Issue Codes
+   Soroticket Playground — Create Campaign · Issue Codes
    ═══════════════════════════════════════════════════════════════════ */
 
 function dtLocal(offsetDays) {

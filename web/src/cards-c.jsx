@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — Delegates (advanced)
+   Soroticket Playground — Delegates (advanced)
    ═══════════════════════════════════════════════════════════════════ */
 
 function Delegates() {

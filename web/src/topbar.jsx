@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — top bar
+   Soroticket Playground — top bar
    ═══════════════════════════════════════════════════════════════════ */
 
 /* coupon/ticket mark */
@@ -33,7 +33,7 @@ function TopBar() {
         <div className="brand">
           <span className="mark">
             <Logo className="logo" />
-            <span className="word">Sorodeal</span>
+            <span className="word">Soroticket</span>
           </span>
           <span className="sub">Playground</span>
         </div>

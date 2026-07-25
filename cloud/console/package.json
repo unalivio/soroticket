@@ -1,9 +1,9 @@
 {
-  "name": "sorodeal-console",
+  "name": "soroticket-console",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Sorodeal Cloud console — self-service web app over the Cloud API.",
+  "description": "Soroticket Cloud console — self-service web app over the Cloud API.",
   "license": "Apache-2.0",
   "scripts": {
     "dev": "vite",

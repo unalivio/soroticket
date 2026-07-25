@@ -1,4 +1,4 @@
-# Sorodeal — worked use cases
+# Soroticket — worked use cases
 
 End-to-end integration profiles over the deployed primitives. Everything here
 is labeled **implemented** (works today on the testnet preview) or **planned**
@@ -73,7 +73,7 @@ integrator regardless of granularity.
 - A photographed QR leaks. `order_ref` dedup bounds the damage; placing the
   QR under the capsule (scannable only after opening) both defeats copying
   and destroys resale value.
-- Abuse detection is an integrator-layer responsibility by design: Sorodeal
+- Abuse detection is an integrator-layer responsibility by design: Soroticket
   supplies the opaque commitments and the tamper-evident record, the
   integrator applies the policy (e.g. suspend deliveries).
 - Communicate it accordingly: "validated scan", "registered delivery",

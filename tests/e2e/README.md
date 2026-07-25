@@ -1,6 +1,6 @@
-# Sorodeal — end-to-end tests
+# Soroticket — end-to-end tests
 
-Consumer tester apps that exercise the Sorodeal coupon-ledger contract against
+Consumer tester apps that exercise the Soroticket coupon-ledger contract against
 the **live Stellar testnet** deployment through the published SDKs — one per
 language, each importing its SDK exactly as an external integrator would.
 
@@ -10,8 +10,8 @@ exits non-zero if any scenario fails.
 
 | Runner | Consumes | Run |
 |---|---|---|
-| `go/` | `github.com/sorodeal/sorodeal-go` (local `replace`) | `cd go && go run .` |
-| `ts/` | `@sorodeal/sdk` (local `file:`) | `cd ts && npm install && npm run e2e` |
+| `go/` | `github.com/soroticket/soroticket-go` (local `replace`) | `cd go && go run .` |
+| `ts/` | `@soroticket/sdk` (local `file:`) | `cd ts && npm install && npm run e2e` |
 
 Both target the contract in `deployments/testnet.json`. A full run takes
 ~3–5 minutes (most steps wait for a testnet ledger to close; the expiry check
@@ -59,6 +59,6 @@ count-only settle `#18`; `bump_tally` ok / unknown `#12`.
   recovers contract error codes via `contractErrorCode(tx.simulation.error)`
   (the typed bindings drop the code on a simulation trap).
 - The Go runner uses the hand-written in-process client; contract traps surface
-  as `*sorodeal.ContractError` (`sorodeal.CodeOf`).
+  as `*soroticket.ContractError` (`soroticket.CodeOf`).
 - Settlement uses the testnet native-XLM SAC as the payout token; the owner pays
   the creator `count * rate` base-units (stroops) from its own balance.

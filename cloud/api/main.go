@@ -1,4 +1,4 @@
-// Command sorodeal-cloud is the hosted-platform API for the Sorodeal protocol
+// Command soroticket-cloud is the hosted-platform API for the Soroticket protocol
 // (docs/CLOUD.md): a REST layer + console backend over the coupon-ledger
 // contract, with per-org custodial Stellar accounts, prepaid-credits metering,
 // and both coupon profiles plus loyalty programs.
@@ -33,7 +33,7 @@ type server struct {
 }
 
 func main() {
-	dataDir := envOr("SDCLOUD_DATA", "data")
+	dataDir := envOr("SOROTICKET_DATA", "data")
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		log.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func main() {
 	go s.webhookLoop()
 
 	addr := envOr("SDCLOUD_ADDR", "127.0.0.1:8787")
-	log.Printf("sorodeal-cloud listening on http://%s (data: %s)", addr, dataDir)
+	log.Printf("soroticket-cloud listening on http://%s (data: %s)", addr, dataDir)
 	httpServer := &http.Server{
 		Addr:              addr,
 		Handler:           securityHeaders(mux),

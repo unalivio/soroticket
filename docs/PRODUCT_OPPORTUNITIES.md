@@ -1,4 +1,4 @@
-# Oportunidades de producto para Sorodeal
+# Oportunidades de producto para Soroticket
 
 Estado: ideas de producto, **no funcionalidades implementadas**. La prioridad
 considera cuánto reutilizan los primitives actuales (Burn, Tally, recibos,
@@ -20,7 +20,7 @@ la infraestructura actual sin exigir primero una economía completa de puntos.
 
 ## 1. Referidos y afiliados verificables
 
-Cada creador, vendedor o cliente recibe un código; Sorodeal publica receipts y
+Cada creador, vendedor o cliente recibe un código; Soroticket publica receipts y
 ancla el total, espera una ventana de devolución y liquida el monto aprobado.
 
 Valor diferencial: el afiliado puede verificar inclusión y términos de pago,
@@ -119,7 +119,7 @@ personal desde datos públicos.
 Asistencia a cursos, certificaciones cortas, voluntariado o acceso a una
 comunidad. Se parece a un entitlement, no a un cupón; necesitaría revocación,
 emisor verificable y posiblemente estándares de credenciales fuera de
-Sorodeal. Puede venderse como módulo white-label a academias y eventos.
+Soroticket. Puede venderse como módulo white-label a academias y eventos.
 
 ## Capacidades horizontales que multiplican todos los productos
 

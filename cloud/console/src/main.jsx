@@ -15,7 +15,7 @@ import { ApiKeysPage, UsagePage, WebhooksPage, SettingsPage } from "./pages/Plat
 
 function Router() {
   const { booting, user, org, route } = useApp();
-  if (booting) return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}><span className="mono faint">Sorodeal Console…</span></div>;
+  if (booting) return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}><span className="mono faint">Soroticket Console…</span></div>;
   if (!user) return <AuthPage />;
   if (!org) return <CreateOrgPage />;
 

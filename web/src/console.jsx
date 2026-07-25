@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — console / activity log · toasts · footer
+   Soroticket Playground — console / activity log · toasts · footer
    ═══════════════════════════════════════════════════════════════════ */
 
 function fmtJSON(obj) {
@@ -108,7 +108,7 @@ function Benefits() {
     <section className="band-dark" style={{ padding: "84px 0" }}>
       <div className="wrap">
         <div className="section-head">
-          <div className="eyebrow">Why Sorodeal</div>
+          <div className="eyebrow">Why Soroticket</div>
           <h2 className="display">A standard, not a silo</h2>
         </div>
         <div className="ben-grid">
@@ -142,7 +142,7 @@ function Footer() {
         <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div style={{ maxWidth: 320 }}>
             <div className="brand" style={{ marginBottom: 12 }}>
-              <span className="mark"><Logo className="logo" /><span className="word">Sorodeal</span></span>
+              <span className="mark"><Logo className="logo" /><span className="word">Soroticket</span></span>
             </div>
             <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.55 }}>The open coupon protocol on Stellar — legacy v0.1 testnet preview.</p>
           </div>

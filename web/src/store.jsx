@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — app store (REAL contract on Stellar testnet)
+   Soroticket Playground — app store (REAL contract on Stellar testnet)
    Replaces the simulated store: every write is signed with Freighter and
    submitted to the configured testnet contract; reads are RPC simulations.
    Campaigns are loaded from the contract's owner index. A small in-memory

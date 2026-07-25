@@ -1,7 +1,7 @@
 {
-  "name": "@sorodeal/sdk",
+  "name": "@soroticket/sdk",
   "version": "0.2.0",
-  "description": "TypeScript SDK for the Sorodeal coupon protocol on Stellar Soroban (Burn + Tally).",
+  "description": "TypeScript SDK for the Soroticket coupon protocol on Stellar Soroban (Burn + Tally).",
   "license": "Apache-2.0",
   "type": "module",
   "exports": "./dist/index.js",

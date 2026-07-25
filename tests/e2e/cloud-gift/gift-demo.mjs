@@ -1,5 +1,5 @@
 /**
- * Proof-of-gift / delivery demo — "the wine-bottle problem" over Sorodeal
+ * Proof-of-gift / delivery demo — "the wine-bottle problem" over Soroticket
  * Cloud (docs/USE_CASES.md §1), exercised exactly like a real integrator:
  * sign up, mint an API key, then run everything through the REST API.
  *
@@ -17,7 +17,7 @@
  */
 import { Keypair } from "@stellar/stellar-sdk";
 
-const API = process.env.SORODEAL_API ?? "http://localhost:8787";
+const API = process.env.SOROTICKET_API ?? "http://localhost:8787";
 const RATE = 1000n; // stroops per verified serving (0.0001 XLM)
 
 // ── tiny harness ─────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ async function createWithFundingRetry(path, body) {
 
 // ═════════════════════════════════════════════════════════════════════
 async function main() {
-  console.log("Sorodeal Cloud — proof-of-gift/delivery demo (wine bottles)");
+  console.log("Soroticket Cloud — proof-of-gift/delivery demo (wine bottles)");
   console.log(`api: ${API} · env: test\n`);
 
   // ── onboarding: the developer path ─────────────────────────────────

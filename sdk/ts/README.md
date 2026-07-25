@@ -1,6 +1,6 @@
-# @sorodeal/sdk
+# @soroticket/sdk
 
-TypeScript/JavaScript SDK for the **Sorodeal** coupon protocol on Stellar
+TypeScript/JavaScript SDK for the **Soroticket** coupon protocol on Stellar
 Soroban — Burn (unique tokens) and Tally (shared codes + settlement). Works in
 the browser (Freighter) and on the server (keypair).
 
@@ -18,9 +18,9 @@ npm install   # then: npm run build
 ## Read (no signer)
 
 ```ts
-import { sorodeal } from "@sorodeal/sdk";
+import { soroticket } from "@soroticket/sdk";
 
-const c = sorodeal({ contractId: "C_REVIEWED_DEPLOYMENT" });
+const c = soroticket({ contractId: "C_REVIEWED_DEPLOYMENT" });
 const token = (await c.verify({ campaign_id: 1n, code: "DEMO0001" })).result.unwrap();
 console.log(token.is_burned ? "BURNED" : "VALID");
 
@@ -30,10 +30,10 @@ const mine = (await c.campaigns_of({ owner: "G..." })).result; // bigint[]
 ## Write — server (keypair)
 
 ```ts
-import { sorodeal, keypairSigner } from "@sorodeal/sdk";
+import { soroticket, keypairSigner } from "@soroticket/sdk";
 
 const signer = keypairSigner(process.env.SECRET!); // S...
-const c = sorodeal({
+const c = soroticket({
   contractId: "C_REVIEWED_V2_DEPLOYMENT",
   publicKey: signer.publicKey,
   signTransaction: signer.signTransaction,
@@ -49,10 +49,10 @@ const campaignId = (await tx.signAndSend()).result.unwrap();
 ## Write — browser (Freighter)
 
 ```ts
-import { sorodeal, freighterSigner, redeemerCommitment } from "@sorodeal/sdk";
+import { soroticket, freighterSigner, redeemerCommitment } from "@soroticket/sdk";
 
 const signer = await freighterSigner();
-const c = sorodeal({
+const c = soroticket({
   contractId: "C_REVIEWED_V2_DEPLOYMENT",
   publicKey: signer.publicKey,
   signTransaction: signer.signTransaction,
@@ -82,7 +82,7 @@ per-error UX, this package also ships a hand-written low-level client that
 surfaces it:
 
 ```ts
-import { freighterClient } from "@sorodeal/sdk";
+import { freighterClient } from "@soroticket/sdk";
 
 const c = freighterClient({
   contractId: "C...", rpcUrl: "https://soroban-testnet.stellar.org",
@@ -101,7 +101,7 @@ const { tx } = await c.registerShared(
   address, 1n, "FALL25", "G_CREATOR", "C_PAYOUT_TOKEN", "10000000",
 );
 
-// v0.2 owner: grant a bounded allowance to the Sorodeal contract.
+// v0.2 owner: grant a bounded allowance to the Soroticket contract.
 await c.approveSettlement(address, "C_PAYOUT_TOKEN", 40_000n, 12_345_678);
 // A keeper may then call settleFor(keeperAddress, ownerAddress, ...).
 ```

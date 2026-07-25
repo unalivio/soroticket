@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	sd "github.com/sorodeal/sorodeal-go"
+	sd "github.com/soroticket/soroticket-go"
 )
 
 // isoWeekPeriod encodes an ISO week as YYYYWW (e.g. 202628). If one week needs

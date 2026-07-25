@@ -9,7 +9,7 @@ function TicketArt() {
       <div className="ticket-perf" />
       <div style={{ padding: "26px 24px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)", letterSpacing: ".1em" }}>SORODEAL · ILLUSTRATION</span>
+          <span className="mono" style={{ fontSize: 11, color: "var(--ink-3)", letterSpacing: ".1em" }}>SOROTICKET · ILLUSTRATION</span>
           <Pill kind="valid">Example</Pill>
         </div>
         <div className="mono" style={{ fontSize: 36, fontWeight: 600, letterSpacing: ".02em" }}>10OFF</div>
@@ -51,7 +51,7 @@ export function AuthPage() {
       <div className="auth-left">
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <div className="side-logo"><Ic.coupon /></div>
-          <span style={{ fontFamily: "var(--serif)", fontWeight: 560, fontSize: 21 }}>Sorodeal</span>
+          <span style={{ fontFamily: "var(--serif)", fontWeight: 560, fontSize: 21 }}>Soroticket</span>
         </div>
         <div style={{ flex: 1, display: "grid", placeItems: "center" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 26, maxWidth: 380 }}>

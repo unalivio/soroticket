@@ -17,7 +17,7 @@ const (
 )
 
 // handleAuditTally publishes the signed receipt set and one Merkle inclusion
-// proof per receipt. It intentionally needs no Sorodeal account/API key: the
+// proof per receipt. It intentionally needs no Soroticket account/API key: the
 // value of a commitment is that creators and auditors can verify it without
 // trusting the merchant dashboard.
 func (s *server) handleAuditTally(w http.ResponseWriter, r *http.Request) {

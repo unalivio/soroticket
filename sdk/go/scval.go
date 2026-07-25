@@ -1,4 +1,4 @@
-package sorodeal
+package soroticket
 
 import (
 	"fmt"

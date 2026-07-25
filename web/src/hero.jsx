@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — hero + lifecycle diagram + hero illustration
+   Soroticket Playground — hero + lifecycle diagram + hero illustration
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Stellar-style charcoal + yellow-brush "coupon machine" illustration.
@@ -143,7 +143,7 @@ function Hero() {
             <span className="eyebrow">The open coupon protocol on Stellar</span>
             <h1 className="display">Issue, redeem &amp; verify coupons on-chain.</h1>
             <p className="lede">
-              Sorodeal is a permissionless protocol for tokenized coupons and redeemable codes on
+              Soroticket is a permissionless protocol for tokenized coupons and redeemable codes on
               Stellar Soroban. This playground calls the real v0.2.0 testnet deployment —
               a preview environment: testnet only, never real value.
             </p>

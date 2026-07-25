@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Sorodeal Playground — action card shell + result primitives
+   Soroticket Playground — action card shell + result primitives
    ═══════════════════════════════════════════════════════════════════ */
 
 function ActionCard({ num, id, title, desc, auth, locked, lockMsg, snippets, label, children }) {

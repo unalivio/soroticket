@@ -1,6 +1,6 @@
-# Sorodeal Cloud — implementation status and API v1
+# Soroticket Cloud — implementation status and API v1
 
-Sorodeal Cloud is the hosted convenience layer over the open contract: a Go
+Soroticket Cloud is the hosted convenience layer over the open contract: a Go
 REST API, SQLite index and React console for teams that do not want to operate a
 wallet or SDK directly.
 
@@ -232,8 +232,8 @@ Supported events are `redemption.created`, `tally.committed`,
   rejected.
 - Payloads are signed as
   `HMAC-SHA256(secret, timestamp + "." + raw_body)` in
-  `X-Sorodeal-Signature: v1=<hex>`.
-- Delivery ID, event type and timestamp are sent in `X-Sorodeal-*` headers.
+  `X-Soroticket-Signature: v1=<hex>`.
+- Delivery ID, event type and timestamp are sent in `X-Soroticket-*` headers.
 - Envelopes always declare `network: "testnet"`, `production: false`,
   `livemode: false` and public mode `test`/`metered`; internal DB mode `live`
   remains only for backward compatibility.

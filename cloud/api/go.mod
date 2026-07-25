@@ -1,9 +1,9 @@
-module github.com/sorodeal/sorodeal-cloud
+module github.com/soroticket/soroticket-cloud
 
 go 1.25.12
 
 require (
-	github.com/sorodeal/sorodeal-go v0.0.0
+	github.com/soroticket/soroticket-go v0.0.0
 	github.com/stellar/go-stellar-sdk v0.6.0
 	golang.org/x/crypto v0.45.0
 	modernc.org/sqlite v1.34.4
@@ -33,4 +33,4 @@ require (
 	modernc.org/token v1.1.0 // indirect
 )
 
-replace github.com/sorodeal/sorodeal-go => ../../sdk/go
+replace github.com/soroticket/soroticket-go => ../../sdk/go

@@ -1,4 +1,4 @@
-# Sorodeal — roadmap and release gates
+# Soroticket — roadmap and release gates
 
 Status snapshot: 2026-07-12. This file distinguishes working code from design
 targets so the console and documentation do not imply mock features are live.

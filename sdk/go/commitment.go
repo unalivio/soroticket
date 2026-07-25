@@ -1,4 +1,4 @@
-package sorodeal
+package soroticket
 
 import (
 	"crypto/hmac"
@@ -46,7 +46,7 @@ func HMACRedeemerCommitment(ref string, pepper []byte) ([32]byte, error) {
 		return out, errors.New("merchant pepper must contain at least 32 bytes")
 	}
 	mac := hmac.New(sha256.New, pepper)
-	_, _ = mac.Write([]byte("sorodeal/redeemer/v1"))
+	_, _ = mac.Write([]byte("soroticket/redeemer/v1"))
 	_, _ = mac.Write([]byte{0})
 	_, _ = mac.Write([]byte(ref))
 	copy(out[:], mac.Sum(nil))

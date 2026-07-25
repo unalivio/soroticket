@@ -44,7 +44,7 @@ export function Shell({ children }) {
         <div className="side-brand">
           <div className="side-logo"><Ic.coupon /></div>
           <div>
-            <div className="side-word">Sorodeal</div>
+            <div className="side-word">Soroticket</div>
             <div className="side-sub">Console</div>
           </div>
         </div>

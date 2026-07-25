@@ -1,5 +1,5 @@
 /**
- * @sorodeal/sdk — ergonomic layer over the generated, typed contract client.
+ * @soroticket/sdk — ergonomic layer over the generated, typed contract client.
  * Network presets, signer helpers (Freighter for browsers, keypair for servers),
  * and the off-chain redeemer commitment. The typed `Client` (all contract
  * methods + types + Errors) is re-exported from `./contract`.
@@ -34,15 +34,15 @@ export const TESTNET = {
   rpcUrl: "https://soroban-testnet.stellar.org",
 } as const;
 
-export type SorodealOptions = Partial<ClientOptions>;
+export type SoroticketOptions = Partial<ClientOptions>;
 
 /**
- * Build a typed Sorodeal client (defaults to testnet). Read-only calls need no
+ * Build a typed Soroticket client (defaults to testnet). Read-only calls need no
  * signer; writes need `publicKey` + `signTransaction` (see keypairSigner /
  * freighterSigner). Override `contractId`/`rpcUrl`/`networkPassphrase` for other
  * deployments.
  */
-export function sorodeal(opts: SorodealOptions = {}): Client {
+export function soroticket(opts: SoroticketOptions = {}): Client {
   return new Client({
     contractId: TESTNET.contractId,
     networkPassphrase: TESTNET.networkPassphrase,
@@ -71,8 +71,8 @@ export async function freighterSigner(networkPassphrase: string = TESTNET.networ
 }
 
 /**
- * Grant the Sorodeal contract an exact settlement allowance on a SAC payout
- * token (contract v0.2+). The owner signs `approve(owner, sorodeal, amount,
+ * Grant the Soroticket contract an exact settlement allowance on a SAC payout
+ * token (contract v0.2+). The owner signs `approve(owner, soroticket, amount,
  * live_until_ledger)` on the token; any keeper can then trigger `settle` for
  * the committed period, which consumes the allowance via `transfer_from`.
  * Approve only the exact period total right before settling — no standing

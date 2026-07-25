@@ -1,4 +1,4 @@
-/* Sorodeal Console — API client. Same-origin via the Vite proxy (/api → :8787),
+/* Soroticket Console — API client. Same-origin via the Vite proxy (/api → :8787),
    session cookie auth, environment via X-Env. Contract errors arrive as
    problem+json {status, code, name, message} and are re-thrown enriched. */
 

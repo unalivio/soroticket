@@ -1,4 +1,4 @@
-package sorodeal
+package soroticket
 
 import (
 	"context"
@@ -499,7 +499,7 @@ func (c *Client) ComputePayouts(ctx context.Context, id uint64, code string, per
 
 // Settle pays each attributed address from the signer's balance. The signer is
 // used as both campaign owner and fee payer. On contract v0.2+, settlement
-// consumes the allowance previously granted to the Sorodeal contract.
+// consumes the allowance previously granted to the Soroticket contract.
 func (c *Client) Settle(ctx context.Context, id uint64, code string, period uint64) ([]Payout, error) {
 	return c.SettleFor(ctx, c.Address(), id, code, period)
 }
@@ -519,7 +519,7 @@ func (c *Client) SettleFor(ctx context.Context, ownerAddress string, id uint64, 
 	return payoutsFromScVal(v)
 }
 
-// ApproveSettlement grants the Sorodeal contract an allowance on payoutToken,
+// ApproveSettlement grants the Soroticket contract an allowance on payoutToken,
 // enabling permissionless settlements up to amount until expirationLedger.
 func (c *Client) ApproveSettlement(ctx context.Context, payoutToken string, amount *big.Int, expirationLedger uint32) error {
 	from, err := scAddress(c.Address())
@@ -545,7 +545,7 @@ func (c *Client) ApproveSettlement(ctx context.Context, payoutToken string, amou
 }
 
 // SettlementAllowance returns the owner's token allowance granted to the
-// Sorodeal contract.
+// Soroticket contract.
 func (c *Client) SettlementAllowance(ctx context.Context, payoutToken, ownerAddress string) (*big.Int, error) {
 	owner, err := scAddress(ownerAddress)
 	if err != nil {

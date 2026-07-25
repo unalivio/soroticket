@@ -1,6 +1,6 @@
-# sorodeal-go
+# soroticket-go
 
-Go SDK for the **Sorodeal** coupon protocol on Stellar Soroban — the **Burn**
+Go SDK for the **Soroticket** coupon protocol on Stellar Soroban — the **Burn**
 profile (unique single-use codes) and the **Tally** profile (shared codes +
 settlement).
 
@@ -17,13 +17,13 @@ SDK's internal submission retry; an application retry must still reuse its own
 business/idempotency key, especially for campaign creation.
 
 ```bash
-go get github.com/sorodeal/sorodeal-go
+go get github.com/soroticket/soroticket-go
 ```
 
 ## Read (no signer)
 
 ```go
-c, _ := sorodeal.New(sorodeal.Config{}) // legacy v0.1 testnet compatibility
+c, _ := soroticket.New(soroticket.Config{}) // legacy v0.1 testnet compatibility
 defer c.Close()
 
 camp, _ := c.GetCampaign(ctx, 1)
@@ -36,14 +36,14 @@ ok, _ := c.IsValid(ctx, 1, "DEMO0001")
 
 ```go
 kp := keypair.MustParseFull("S...")          // or keypair.Random()
-c, _ := sorodeal.Testnet(kp)
+c, _ := soroticket.Testnet(kp)
 
 // create a campaign owned by the signer
 id, _ := c.CreateCampaign(ctx, "Cafe", "percentage", 1500, 100, validUntil)
 c.IssueUnique(ctx, id, []string{"SAVE0001", "SAVE0002"})
 
 // randomized commitment; store nonce only if later proof is required
-ref, nonce, _ := sorodeal.RedeemerCommitment("order-8842")
+ref, nonce, _ := soroticket.RedeemerCommitment("order-8842")
 _ = nonce
 receipt, _ := c.RedeemUnique(ctx, id, "SAVE0001", ref)
 ```
@@ -55,11 +55,11 @@ several actors (owner, delegate, …). Reads need no signer.
 
 ```go
 // v0.2 example only: reviewedV2ID must name a real deployed candidate.
-owner, _ := sorodeal.New(sorodeal.Config{ContractID: reviewedV2ID, Signer: kp})
+owner, _ := soroticket.New(soroticket.Config{ContractID: reviewedV2ID, Signer: kp})
 id, _ := owner.CreateCampaign(ctx, "Creator promo", "percentage", 1000, 100, validUntil)
 
 rate := big.NewInt(1000) // token base-units per attributed redemption
-creator := "G..."; token := sorodeal.TestnetNativeSAC // any SAC
+creator := "G..."; token := soroticket.TestnetNativeSAC // any SAC
 owner.RegisterShared(ctx, id, "FALL25", &creator, &token, rate)        // immutable token+rate
 owner.CommitTally(ctx, id, "FALL25", 1, 40, merkleRoot, map[string]uint32{creator: 40})
 payouts, _ := owner.ComputePayouts(ctx, id, "FALL25", 1)               // preview (no transfer)
@@ -81,7 +81,7 @@ Contract traps surface as `*ContractError` carrying the contract's numeric code:
 
 ```go
 _, err := c.RedeemUnique(ctx, id, "USED", ref)
-if code, ok := sorodeal.CodeOf(err); ok && code == sorodeal.ErrAlreadyRedeemed {
+if code, ok := soroticket.CodeOf(err); ok && code == soroticket.ErrAlreadyRedeemed {
     // code.String() == "AlreadyRedeemed"
 }
 ```

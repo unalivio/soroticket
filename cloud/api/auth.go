@@ -26,7 +26,7 @@ type authCtx struct {
 type ctxKey struct{}
 
 var dummyPasswordHash = func() []byte {
-	hash, _ := bcrypt.GenerateFromPassword([]byte("not-a-real-sorodeal-password"), bcrypt.DefaultCost)
+	hash, _ := bcrypt.GenerateFromPassword([]byte("not-a-real-soroticket-password"), bcrypt.DefaultCost)
 	return hash
 }()
 

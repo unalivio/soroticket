@@ -1,8 +1,8 @@
-# Sorodeal
+# Soroticket
 
 **An open protocol and hosted suite for coupons, vouchers, tickets and loyalty on Stellar Soroban — with signed audit receipts and token settlement.**
 
-Sorodeal combines a permissionless contract, Go/TypeScript SDKs, a developer playground and a hosted Cloud API. Burn redemptions are recorded individually on-chain; high-volume shared-code events stay off-chain as signed receipts and are periodically anchored by a Merkle root. Attributed tallies may pay a configured Stellar asset.
+Soroticket combines a permissionless contract, Go/TypeScript SDKs, a developer playground and a hosted Cloud API. Burn redemptions are recorded individually on-chain; high-volume shared-code events stay off-chain as signed receipts and are periodically anchored by a Merkle root. Attributed tallies may pay a configured Stellar asset.
 
 > **Security status (2026-07-11):** the immutable testnet v0.1 deployment is deprecated because it permits creator underpayment and requires owner-authorized settlement. Contract v0.2 is built and tested locally, but **has not been deployed**. Cloud's TEST/METERED previews still use legacy v0.1 and neither environment is production or mainnet. See `deployments/` and `docs/SECURITY_AUDIT_2026-07-11.md`.
 
@@ -41,7 +41,7 @@ Spec nouns: **Campaign → Code → Redemption → Settlement.**
 ## Repo layout
 
 ```
-sorodeal/
+soroticket/
 ├── README.md
 ├── CLAUDE.md                 # orientation for AI sessions — read this first
 ├── contracts/
@@ -54,11 +54,11 @@ sorodeal/
 │   └── DECISIONS.md          # architecture decision records
 ├── deployments/              # on-chain deployment records (testnet.json)
 ├── sdk/
-│   ├── ts/                   # @sorodeal/sdk — typed client (generated) + ergonomic wrapper + browser client
-│   └── go/                   # github.com/sorodeal/sorodeal-go — in-process signing over Soroban RPC
+│   ├── ts/                   # @soroticket/sdk — typed client (generated) + ergonomic wrapper + browser client
+│   └── go/                   # github.com/soroticket/soroticket-go — in-process signing over Soroban RPC
 ├── tests/
 │   └── e2e/                  # consumer tester apps; historical scenarios target legacy testnet v0.1
-├── web/                      # developer playground — Vite/React + Freighter (consumes @sorodeal/sdk)
+├── web/                      # developer playground — Vite/React + Freighter (consumes @soroticket/sdk)
 └── reference/
     └── botcore-donor/        # reference-only Go from the prototype (does NOT build standalone)
         ├── stellar-adapter/  # how the contract was invoked (CLI shell-out — superseded by sdk/go)

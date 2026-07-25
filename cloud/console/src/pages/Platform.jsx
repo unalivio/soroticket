@@ -285,7 +285,7 @@ export function WebhooksPage() {
       </div>}
 
       <div className="card" style={{ padding: "16px 20px", fontSize: 12.5, color: "var(--ink-2)", lineHeight: 1.6 }}>
-        Verify <span className="mono">X-Sorodeal-Signature</span> over <span className="mono">timestamp + "." + raw_body</span>, reject stale timestamps, and deduplicate with <span className="mono">X-Sorodeal-Delivery</span>.
+        Verify <span className="mono">X-Soroticket-Signature</span> over <span className="mono">timestamp + "." + raw_body</span>, reject stale timestamps, and deduplicate with <span className="mono">X-Soroticket-Delivery</span>.
       </div>
       {create && <CreateWebhookModal events={data?.supported_events || []} onClose={(changed) => { setCreate(false); if (changed) load(); }} />}
     </div>
@@ -309,7 +309,7 @@ function CreateWebhookModal({ events, onClose }) {
   return <Modal onClose={() => onClose(!!created)} width={560}>
     {!created ? <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div><div style={{ fontSize: 16, fontWeight: 650 }}>Add webhook endpoint</div><div style={{ fontSize: 12.5, color: "var(--ink-3)", marginTop: 2 }}>Public HTTPS endpoints only; redirects and private network destinations are blocked.</div></div>
-      <div className="field"><label>Endpoint URL</label><input className="input mono" value={url} onChange={(e) => setURL(e.target.value)} placeholder="https://example.com/sorodeal/webhooks" autoFocus /></div>
+      <div className="field"><label>Endpoint URL</label><input className="input mono" value={url} onChange={(e) => setURL(e.target.value)} placeholder="https://example.com/soroticket/webhooks" autoFocus /></div>
       <div className="field"><label>Events</label><div style={{ display: "flex", flexDirection: "column", gap: 7 }}>{events.map((event) => <label key={event} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5 }}><input type="checkbox" checked={selected.has(event)} onChange={() => toggle(event)} /><span className="mono">{event}</span></label>)}</div></div>
       <ErrText err={err} />
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 9 }}><button className="btn-plain" onClick={() => onClose(false)}>Cancel</button><BtnPrimary small busy={busy} onClick={submit}>Create endpoint</BtnPrimary></div>

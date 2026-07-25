@@ -1,7 +1,7 @@
 /**
- * Consumer E2E tester for @sorodeal/sdk against the LIVE Stellar testnet
+ * Consumer E2E tester for @soroticket/sdk against the LIVE Stellar testnet
  * deployment. It uses the package exactly as a server integrator would — the
- * generated typed `Client` (via `sorodeal()`), `keypairSigner` for in-process
+ * generated typed `Client` (via `soroticket()`), `keypairSigner` for in-process
  * signing, and `contractErrorCode` to recover the contract error code the typed
  * bindings drop on simulation failures.
  *
@@ -11,7 +11,7 @@
  *
  *   npm install && npm run e2e
  */
-import { sorodeal, keypairSigner, contractErrorCode, approveSettlement, TESTNET } from "@sorodeal/sdk";
+import { soroticket, keypairSigner, contractErrorCode, approveSettlement, TESTNET } from "@soroticket/sdk";
 import { Keypair } from "@stellar/stellar-sdk";
 import { createHash } from "node:crypto";
 
@@ -111,12 +111,12 @@ async function fund(addr) {
 
 function client(secret) {
   const s = keypairSigner(secret);
-  return sorodeal({ publicKey: s.publicKey, signTransaction: s.signTransaction });
+  return soroticket({ publicKey: s.publicKey, signTransaction: s.signTransaction });
 }
 
 // ═══════════════════════════════════════════════════════════════════
 async function main() {
-  console.log("Sorodeal TS SDK — end-to-end against testnet");
+  console.log("Soroticket TS SDK — end-to-end against testnet");
   console.log(`contract: ${TESTNET.contractId}\n`);
 
   const owner = Keypair.random(), delegate = Keypair.random(), stranger = Keypair.random(), creator = Keypair.random();
@@ -129,7 +129,7 @@ async function main() {
   const D = client(delegate.secret());
   const S = client(stranger.secret());
   const C = client(creator.secret());
-  const pub = sorodeal(); // read-only
+  const pub = soroticket(); // read-only
   const ownerAddr = owner.publicKey(), creatorAddr = creator.publicKey();
 
   // ── EXPIRY: kick off early, assert late ────────────────────────────

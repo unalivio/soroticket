@@ -1,9 +1,9 @@
-module sorodeal-e2e
+module soroticket-e2e
 
 go 1.25.12
 
 require (
-	github.com/sorodeal/sorodeal-go v0.0.0
+	github.com/soroticket/soroticket-go v0.0.0
 	github.com/stellar/go-stellar-sdk v0.6.0
 )
 
@@ -18,4 +18,4 @@ require (
 	golang.org/x/sync v0.18.0 // indirect
 )
 
-replace github.com/sorodeal/sorodeal-go => ../../../sdk/go
+replace github.com/soroticket/soroticket-go => ../../../sdk/go
