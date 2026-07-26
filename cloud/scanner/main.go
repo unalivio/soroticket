@@ -1,0 +1,393 @@
+// Command soroticket-scanner is the WhatsApp scan endpoint of Soroticket
+// (docs: the product PDF's Camino A / Camino B split). It is a CONSUMER of the
+// Soroticket Cloud API — it never creates coupons, it only receives scans and
+// answers (per the product doc: "El bot no fabrica cupones").
+//
+//   Camino A (customer scans a fixed QR): the scan IS the redemption — a
+//   shared event is recorded with the customer's phone as opaque reference.
+//   Per-person limits ride on the API's order_ref dedup ("scan|CODE|phone").
+//   Gift (proof-of-delivery) campaigns require a second step: the customer
+//   shares their WhatsApp location, which is committed into the signed
+//   receipt as evidence (context_hash); raw coordinates stay in this layer.
+//
+//   Camino B (employee scans the customer's unique QR): the scan IS the
+//   validation — the code burns on-chain; green (VÁLIDO) or red (YA USADO).
+//
+// Blockchain stays invisible: replies never mention hashes or addresses.
+package main
+
+import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/xml"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+)
+
+type config struct {
+	listen     string
+	apiBase    string // Soroticket Cloud API (internal)
+	apiKey     string // sk_test_… — the org this scanner serves
+	publicURL  string // exact webhook URL Twilio signs (behind TLS proxy)
+	twilioAuth string // Twilio auth token; empty = dev mode (signature not enforced)
+}
+
+type scanner struct {
+	cfg    config
+	client *http.Client
+
+	mu      sync.Mutex
+	pending map[string]pendingScan // phone → gift scan awaiting location
+	seenSid map[string]time.Time   // Twilio MessageSid dedup (webhook retries)
+	done    map[string]time.Time   // phone|code → completed scans (UX cache):
+	// answers "ya lo usaste" BEFORE asking for location again. The API's
+	// order_ref dedup remains the source of truth (this cache is lost on
+	// restart; the 409 path then covers it after the location step).
+}
+
+type pendingScan struct {
+	code       string
+	campaignID int64
+	name       string
+	expires    time.Time
+}
+
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
+}
+
+func main() {
+	cfg := config{
+		listen:     envOr("SCANNER_LISTEN", "127.0.0.1:8090"),
+		apiBase:    envOr("SOROTICKET_API", "http://127.0.0.1:8787"),
+		apiKey:     os.Getenv("SOROTICKET_API_KEY"),
+		publicURL:  envOr("SCANNER_PUBLIC_URL", ""),
+		twilioAuth: os.Getenv("TWILIO_AUTH_TOKEN"),
+	}
+	if cfg.apiKey == "" {
+		log.Fatal("SOROTICKET_API_KEY is required (sk_test_… of the org this scanner serves)")
+	}
+	if cfg.twilioAuth == "" {
+		log.Print("WARNING: TWILIO_AUTH_TOKEN unset — webhook signatures are NOT enforced (dev only)")
+	}
+	s := &scanner{
+		cfg:     cfg,
+		client:  &http.Client{Timeout: 60 * time.Second},
+		pending: map[string]pendingScan{},
+		seenSid: map[string]time.Time{},
+		done:    map[string]time.Time{},
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"service":"soroticket-scanner"}`))
+	})
+	mux.HandleFunc("POST /bot/whatsapp/webhook", s.handleWebhook)
+	log.Printf("soroticket-scanner listening on %s (api %s)", cfg.listen, cfg.apiBase)
+	log.Fatal(http.ListenAndServe(cfg.listen, mux))
+}
+
+// ── Twilio webhook ───────────────────────────────────────────────────
+
+func (s *scanner) handleWebhook(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", 400)
+		return
+	}
+	if !s.validSignature(r) {
+		http.Error(w, "invalid signature", 403)
+		return
+	}
+	sid := r.PostForm.Get("MessageSid")
+	if sid != "" && s.alreadySeen(sid) {
+		reply(w, "") // webhook retry — already answered
+		return
+	}
+	from := r.PostForm.Get("From") // "whatsapp:+58412…"
+	phone := strings.TrimPrefix(from, "whatsapp:")
+	body := strings.TrimSpace(r.PostForm.Get("Body"))
+	lat, lon := r.PostForm.Get("Latitude"), r.PostForm.Get("Longitude")
+
+	switch {
+	case lat != "" && lon != "":
+		reply(w, s.onLocation(phone, lat, lon))
+	case body != "":
+		reply(w, s.onText(phone, body))
+	default:
+		reply(w, "Enviá el código de tu cupón o entrada 🎟️")
+	}
+}
+
+var codePattern = regexp.MustCompile(`[A-Z0-9][A-Z0-9\-]{2,63}`)
+
+// onText resolves the scanned/typed code and runs the right path.
+func (s *scanner) onText(phone, body string) string {
+	code := codePattern.FindString(strings.ToUpper(body))
+	if code == "" {
+		return "🤔 No reconocimos ningún código en tu mensaje. Escaneá el QR o escribí el código tal como aparece."
+	}
+	res, status, err := s.resolve(code)
+	if err != nil {
+		log.Printf("resolve %q: %v", code, err)
+		return "Tuvimos un problema técnico. Probá de nuevo en un momento."
+	}
+	switch {
+	case status == 404:
+		return fmt.Sprintf("🤔 El código %s no existe. Revisá que esté escrito exactamente como aparece.", code)
+	case res.Archived:
+		return fmt.Sprintf("Esta promo (%s) ya no está activa.", res.CampaignName)
+	case res.Expired:
+		return fmt.Sprintf("⏰ %s venció. Preguntá en el local por la promo vigente.", res.CampaignName)
+	}
+
+	if res.Type == "unique" {
+		return s.redeemUnique(phone, res)
+	}
+	if s.alreadyDone(phone, res.Code) {
+		return "Ya usaste este código — es una vez por persona. 😉"
+	}
+	if res.Kind == "gift" {
+		// proof-of-delivery needs the second factor: real device location
+		s.setPending(phone, pendingScan{code: res.Code, campaignID: res.CampaignID, name: res.CampaignName, expires: time.Now().Add(10 * time.Minute)})
+		return "📍 Para validar tu escaneo, compartí tu ubicación:\n\nTocá el clip 📎 → Ubicación → «Enviar tu ubicación actual»."
+	}
+	return s.recordShared(phone, res.CampaignID, res.Code, res.CampaignName, res.DiscountType, res.DiscountValue, evidence{Type: "whatsapp_scan", Policy: "scan-v1"})
+}
+
+// onLocation completes a pending gift scan with the shared location.
+func (s *scanner) onLocation(phone, lat, lon string) string {
+	p, ok := s.takePending(phone)
+	if !ok {
+		return "Recibimos tu ubicación, pero no hay ningún escaneo esperándola. Enviá primero el código del QR."
+	}
+	// Raw coordinates stay in this layer (integrator layer): only a
+	// commitment reaches the signed receipt. journald keeps the raw pair.
+	log.Printf("geo-evidence phone=%s code=%s lat=%s lon=%s", phone, p.code, lat, lon)
+	h := sha256.Sum256([]byte(lat + "|" + lon + "|" + phone + "|" + p.code))
+	ev := evidence{Type: "whatsapp_scan_geo", Policy: "geo-v1", ContextHash: hex.EncodeToString(h[:])}
+	return s.recordShared(phone, p.campaignID, p.code, p.name, "", 0, ev)
+}
+
+// ── Cloud API calls ──────────────────────────────────────────────────
+
+type resolved struct {
+	Type          string `json:"type"`
+	Code          string `json:"code"`
+	CampaignID    int64  `json:"campaign_id"`
+	Kind          string `json:"kind"`
+	CampaignName  string `json:"campaign_name"`
+	DiscountType  string `json:"discount_type"`
+	DiscountValue int64  `json:"discount_value"`
+	Archived      bool   `json:"archived"`
+	Expired       bool   `json:"expired"`
+	Status        string `json:"status"`
+}
+
+type evidence struct {
+	Type, Policy, ContextHash string
+}
+
+func (s *scanner) resolve(code string) (resolved, int, error) {
+	var out resolved
+	status, err := s.api("GET", "/v1/codes/resolve?code="+url.QueryEscape(code), nil, &out)
+	return out, status, err
+}
+
+func (s *scanner) recordShared(phone string, campaignID int64, code, name, discountType string, discountValue int64, ev evidence) string {
+	payload := map[string]any{
+		"customer_ref": phone,
+		// order_ref implements "una vez por persona": the API deduplicates the
+		// same business reference, so a second scan answers 409 (already used).
+		"order_ref":      "scan|" + code + "|" + phone,
+		"evidence_type":  ev.Type,
+		"policy_version": ev.Policy,
+	}
+	if ev.ContextHash != "" {
+		payload["context_hash"] = ev.ContextHash
+	}
+	var out map[string]any
+	status, err := s.api("POST", fmt.Sprintf("/v1/shared-codes/%d/%s/events", campaignID, url.PathEscape(code)), payload, &out)
+	switch {
+	case err != nil:
+		log.Printf("record event %s: %v", code, err)
+		return "Tuvimos un problema técnico registrando tu escaneo. Probá de nuevo."
+	case status == 409:
+		s.markDone(phone, code)
+		return "Ya usaste este código — es una vez por persona. 😉"
+	case status != 201:
+		log.Printf("record event %s: unexpected status %d: %v", code, status, out)
+		return "No pudimos registrar el escaneo. Probá de nuevo en un momento."
+	}
+	s.markDone(phone, code)
+	return "✓ Registrado — " + discountCopy(name, discountType, discountValue) + "\n\nMostrá este mensaje en el mostrador si te lo piden."
+}
+
+func (s *scanner) redeemUnique(phone string, res resolved) string {
+	payload := map[string]any{"campaign_id": res.CampaignID, "code": res.Code, "redeemer_ref": phone}
+	var out map[string]any
+	status, err := s.api("POST", "/v1/redemptions", payload, &out)
+	switch {
+	case err != nil:
+		log.Printf("redeem %s: %v", res.Code, err)
+		return "Tuvimos un problema técnico validando el código. Probá de nuevo."
+	case status == 201:
+		return fmt.Sprintf("✅ VÁLIDO — %s\n%s · recién marcado como usado.", res.CampaignName, res.Code)
+	}
+	if errCode, ok := out["code"].(float64); ok && int(errCode) == 3 { // AlreadyRedeemed
+		return fmt.Sprintf("❌ YA USADO — %s ya fue canjeado antes.", res.Code)
+	}
+	if msg, ok := out["message"].(string); ok && msg != "" {
+		return "❌ " + msg
+	}
+	return "❌ No se pudo validar este código."
+}
+
+func (s *scanner) api(method, path string, body any, out any) (int, error) {
+	var reader io.Reader
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return 0, err
+		}
+		reader = strings.NewReader(string(raw))
+	}
+	req, err := http.NewRequest(method, s.cfg.apiBase+path, reader)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+s.cfg.apiKey)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return resp.StatusCode, err
+	}
+	if out != nil && len(raw) > 0 {
+		_ = json.Unmarshal(raw, out)
+	}
+	return resp.StatusCode, nil
+}
+
+func discountCopy(name, discountType string, value int64) string {
+	switch discountType {
+	case "percentage":
+		return fmt.Sprintf("tenés %d%% de descuento (%s).", value, name)
+	case "fixed_amount":
+		return fmt.Sprintf("tenés %d de descuento (%s).", value, name)
+	default:
+		return "«" + name + "»."
+	}
+}
+
+// ── plumbing ─────────────────────────────────────────────────────────
+
+// validSignature checks X-Twilio-Signature: base64(HMAC-SHA1(token,
+// publicURL + concat(sorted(param+value)))). Dev mode (no token) accepts all.
+func (s *scanner) validSignature(r *http.Request) bool {
+	if s.cfg.twilioAuth == "" {
+		return true
+	}
+	keys := make([]string, 0, len(r.PostForm))
+	for k := range r.PostForm {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	b.WriteString(s.cfg.publicURL)
+	for _, k := range keys {
+		b.WriteString(k)
+		b.WriteString(r.PostForm.Get(k))
+	}
+	mac := hmac.New(sha1.New, []byte(s.cfg.twilioAuth))
+	_, _ = mac.Write([]byte(b.String()))
+	want := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(want), []byte(r.Header.Get("X-Twilio-Signature")))
+}
+
+func (s *scanner) alreadySeen(sid string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for k, t := range s.seenSid {
+		if now.Sub(t) > time.Hour {
+			delete(s.seenSid, k)
+		}
+	}
+	if _, ok := s.seenSid[sid]; ok {
+		return true
+	}
+	s.seenSid[sid] = now
+	return false
+}
+
+func (s *scanner) markDone(phone, code string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for k, t := range s.done {
+		if now.Sub(t) > 24*time.Hour {
+			delete(s.done, k)
+		}
+	}
+	s.done[phone+"|"+code] = now
+}
+
+func (s *scanner) alreadyDone(phone, code string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.done[phone+"|"+code]
+	return ok
+}
+
+func (s *scanner) setPending(phone string, p pendingScan) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pending[phone] = p
+}
+
+func (s *scanner) takePending(phone string) (pendingScan, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, ok := s.pending[phone]
+	if ok {
+		delete(s.pending, phone)
+	}
+	if !ok || time.Now().After(p.expires) {
+		return pendingScan{}, false
+	}
+	return p, true
+}
+
+type twiml struct {
+	XMLName xml.Name `xml:"Response"`
+	Message string   `xml:"Message,omitempty"`
+}
+
+func reply(w http.ResponseWriter, message string) {
+	w.Header().Set("Content-Type", "text/xml")
+	raw, _ := xml.Marshal(twiml{Message: message})
+	_, _ = w.Write([]byte(xml.Header))
+	_, _ = w.Write(raw)
+}
