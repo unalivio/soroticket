@@ -15,3 +15,6 @@ secrets/
 .DS_Store
 .idea/
 .vscode/
+
+# Design/product sources kept out of the repo (deliberate)
+*.pdf
