@@ -94,6 +94,7 @@ All routes below require session/API-key authentication unless marked public.
 | Overview | `GET /v1/overview`, `GET /v1/activity` |
 | Campaigns | `POST/GET /v1/campaigns`, `GET /v1/campaigns/{id}`, `POST /v1/campaigns/{id}/archive` |
 | Burn | `POST /v1/campaigns/{id}/codes`, `GET /v1/verify`, `POST/GET /v1/redemptions` |
+| Scan routing | `GET /v1/codes/resolve?code=X` — routes a bare scanned code (no campaign context) to its campaign: shared first, then unique; active campaigns win |
 | Tally | `POST /v1/campaigns/{id}/shared-codes`, `POST /v1/shared-codes/{cid}/{code}/events`, `POST /v1/shared-codes/{cid}/{code}/commits`, `GET/POST /v1/settlements` |
 | Loyalty | `POST/GET /v1/loyalty/programs`, `GET /v1/loyalty/programs/{id}`, `POST /v1/loyalty/programs/{id}/punches` |
 | Platform | `GET/POST /v1/keys`, `POST /v1/keys/{id}/revoke`, `GET /v1/credits`, `GET /v1/usage` |

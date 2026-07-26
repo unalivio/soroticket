@@ -89,6 +89,7 @@ func main() {
 	mux.HandleFunc("POST /v1/campaigns/{id}/shared-codes", auth(s.idempotent("shared_codes", s.handleRegisterShared)))
 
 	mux.HandleFunc("GET /v1/verify", auth(s.handleVerify))
+	mux.HandleFunc("GET /v1/codes/resolve", auth(s.handleResolveCode))
 	mux.HandleFunc("POST /v1/redemptions", auth(s.idempotent("redemptions", s.handleRedeem)))
 	mux.HandleFunc("GET /v1/redemptions", auth(s.handleListRedemptions))
 

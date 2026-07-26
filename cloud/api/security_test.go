@@ -841,6 +841,42 @@ func TestGeneratedCodeBatchIsBoundedBeforeAllocation(t *testing.T) {
 	}
 }
 
+func TestResolveCodeRoutesSharedThenUniqueWithinOrg(t *testing.T) {
+	s := testServer(t)
+	if _, err := s.db.Exec(`INSERT INTO orgs (id,name,created_at) VALUES (7,'test',0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO campaigns
+	  (id,org_id,env,chain_id,contract_id,kind,name,discount_type,discount_value,total_supply,valid_until,created_at)
+	  VALUES (1,7,'test',41,'`+currentContractID+`','gift','Copas','free_item',1,100,9999999999,0),
+	         (2,7,'test',42,'`+currentContractID+`','ticket','Jazz','entry',1,100,9999999999,0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO shared_codes (id,campaign_id,code,payout_rate,created_at) VALUES (1,1,'COPA-ROSALES','0',0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO codes (id,campaign_id,code,status,created_at) VALUES (1,2,'JAZZ-0042','issued',0)`); err != nil {
+		t.Fatal(err)
+	}
+	resolve := func(code string) (int, map[string]any) {
+		r := authedRequest(http.MethodGet, "/v1/codes/resolve?code="+code, "", "", "test")
+		w := httptest.NewRecorder()
+		s.handleResolveCode(w, r)
+		var body map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &body)
+		return w.Code, body
+	}
+	if code, b := resolve("COPA-ROSALES"); code != 200 || b["type"] != "shared" || b["kind"] != "gift" {
+		t.Fatalf("shared resolve: %d %v", code, b)
+	}
+	if code, b := resolve("JAZZ-0042"); code != 200 || b["type"] != "unique" || b["status"] != "issued" {
+		t.Fatalf("unique resolve: %d %v", code, b)
+	}
+	if code, _ := resolve("GHOST"); code != 404 {
+		t.Fatalf("unknown code should 404, got %d", code)
+	}
+}
+
 func TestLegacyContractRowsFailClosedOnChainOperations(t *testing.T) {
 	s := testServer(t)
 	if _, err := s.db.Exec(`INSERT INTO orgs (id,name,created_at) VALUES (7,'test',0)`); err != nil {
