@@ -6,6 +6,102 @@ import { kindTag, statusOf } from "./Campaigns.jsx";
 
 const isUniqueKind = (k) => k === "voucher" || k === "ticket" || k === "loyalty";
 
+/* ── Who scanned, and from where ─────────────────────────────────────
+   The question a merchant actually opens the dashboard to answer. The customer
+   is identified by the last four digits only — enough to recognise a repeat
+   visitor, not enough to build a contact list. */
+function ScansPanel({ c }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState(null);
+  const [pages, setPages] = useState([]);
+
+  const fetchPage = (cursor) =>
+    api.get(`/v1/campaigns/${c.id}/scans?limit=100${cursor ? `&cursor=${cursor}` : ""}`);
+
+  useEffect(() => {
+    setData(null); setErr(null); setPages([]);
+    fetchPage().then((d) => { setData(d); setPages(d.scans); }).catch(setErr);
+  }, [c.id]);
+
+  if (err) return <div className="card" style={{ padding: 24 }}><ErrText err={err} /></div>;
+  if (!data) return <div className="card" style={{ padding: 24 }}><div className="faint">Cargando escaneos…</div></div>;
+
+  const more = async () => {
+    try {
+      const d = await fetchPage(data.next_cursor);
+      setData(d); setPages((p) => [...p, ...d.scans]);
+    } catch (e) { setErr(e); }
+  };
+
+  const anchorPill = (s) => {
+    if (s.anchor === "committed") return <span className="authtag" title={s.tx_hash ? `tx ${s.tx_hash}` : ""}>anclado · {s.period_label}</span>;
+    if (s.anchor === "legacy") return <span className="authtag">histórico</span>;
+    return <span className="authtag">por anclar</span>;
+  };
+
+  const cols = "150px 110px 1fr 130px 120px";
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {[["Escaneos", data.summary.total_scans],
+          ["Personas distintas", data.summary.distinct_customers],
+          ["Con ubicación", data.summary.with_location]].map(([label, value]) => (
+          <div key={label} className="card" style={{ padding: "16px 20px", flex: "1 1 160px" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)" }}>{label}</div>
+            <div className="display" style={{ fontSize: 30 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {pages.length === 0 ? (
+        <div className="card" style={{ padding: "28px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 650 }}>Todavía nadie escaneó este código</div>
+          <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: 0, lineHeight: 1.55 }}>
+            Cuando alguien escanee el QR verás aquí la hora, los últimos dígitos de su teléfono
+            y desde dónde lo hizo.
+          </p>
+        </div>
+      ) : (
+        <div className="card" style={{ overflow: "hidden" }}>
+          <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "11px 20px", borderBottom: "1px solid var(--line)", background: "var(--surface-inset)" }}>
+            {["Cuándo", "Quién", "Dónde", "Cómo", "En cadena"].map((h) => (
+              <span key={h} className="eyebrow" style={{ fontSize: 11 }}>{h}</span>
+            ))}
+          </div>
+          {pages.map((s) => (
+            <div key={s.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "12px 20px", borderBottom: "1px solid var(--line)", alignItems: "center", fontSize: 13 }}>
+              <span style={{ color: "var(--ink-2)" }}>{fmtDateTime(s.created_at)}</span>
+              <span className="mono">{s.customer_tail ? `···${s.customer_tail}` : <span style={{ color: "var(--ink-3)" }}>anónimo</span>}</span>
+              <span>
+                {s.lat != null ? (
+                  <a className="mono" style={{ fontSize: 12 }} target="_blank" rel="noreferrer"
+                    href={`https://www.google.com/maps?q=${s.lat},${s.lon}`}>
+                    {s.lat.toFixed(5)}, {s.lon.toFixed(5)} ↗
+                    {s.accuracy_m != null && <span style={{ color: "var(--ink-3)" }}> ±{Math.round(s.accuracy_m)} m</span>}
+                  </a>
+                ) : <span style={{ color: "var(--ink-3)" }}>sin ubicación</span>}
+              </span>
+              <span className="mono" style={{ fontSize: 11.5, color: "var(--ink-3)" }}>{s.evidence_type || "—"}</span>
+              <span>{anchorPill(s)}</span>
+            </div>
+          ))}
+          {data.next_cursor && (
+            <div style={{ padding: "12px 20px" }}>
+              <button className="btn-plain" style={{ fontSize: 13 }} onClick={more}>Cargar más</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="help" style={{ margin: 0 }}>
+        De cada persona guardamos solo los últimos cuatro dígitos: alcanza para aplicar «una vez
+        por persona» sin construir una base de datos de clientes. La ubicación es la que el
+        cliente compartió por WhatsApp — queda en tu panel, no en el comprobante público.
+      </p>
+    </div>
+  );
+}
+
 /* ── The printed QR ─────────────────────────────────────────────────
    Scanning it with the phone camera opens WhatsApp with the message ready:
    the customer only presses send. The QR carries an opaque token, never the
@@ -162,7 +258,9 @@ export function CampaignDetailPage({ id }) {
 
       {/* tabs */}
       <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--line)" }}>
-        {[["codes", unique ? "Codes" : "Shared code"], ...(shared ? [["qr", "QR de WhatsApp"]] : []), ["settlement", "Settlement"], ["activity", "Activity"]].map(([k, label]) => {
+        {[["codes", unique ? "Codes" : "Shared code"],
+          ...(shared ? [["scans", "Escaneos"], ["qr", "QR de WhatsApp"]] : []),
+          ["settlement", "Settlement"], ["activity", "Activity"]].map(([k, label]) => {
           const disabled = k === "settlement" && !c.attributed_to;
           return (
             <span key={k} onClick={() => !disabled && (k === "settlement" ? nav("/settlements") : setTab(k))} style={{
@@ -237,6 +335,7 @@ export function CampaignDetailPage({ id }) {
         </div>
       )}
 
+      {tab === "scans" && <ScansPanel c={c} />}
       {tab === "qr" && <QRPanel c={c} />}
 
       {tab === "activity" && <ActivityList campaignID={c.id} />}

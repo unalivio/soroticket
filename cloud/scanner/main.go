@@ -3,15 +3,15 @@
 // Soroticket Cloud API — it never creates coupons, it only receives scans and
 // answers (per the product doc: "El bot no fabrica cupones").
 //
-//   Camino A (customer scans a fixed QR): the scan IS the redemption — a
-//   shared event is recorded with the customer's phone as opaque reference.
-//   Per-person limits ride on the API's order_ref dedup ("scan|CODE|phone").
-//   Gift (proof-of-delivery) campaigns require a second step: the customer
-//   shares their WhatsApp location, which is committed into the signed
-//   receipt as evidence (context_hash); raw coordinates stay in this layer.
+//	Camino A (customer scans a fixed QR): the scan IS the redemption — a
+//	shared event is recorded with the customer's phone as opaque reference.
+//	Per-person limits ride on the API's order_ref dedup ("scan|CODE|phone").
+//	Gift (proof-of-delivery) campaigns require a second step: the customer
+//	shares their WhatsApp location, which is committed into the signed
+//	receipt as evidence (context_hash); raw coordinates stay in this layer.
 //
-//   Camino B (employee scans the customer's unique QR): the scan IS the
-//   validation — the code burns on-chain; green (VÁLIDO) or red (YA USADO).
+//	Camino B (employee scans the customer's unique QR): the scan IS the
+//	validation — the code burns on-chain; green (VÁLIDO) or red (YA USADO).
 //
 // Blockchain stays invisible: replies never mention hashes or addresses.
 package main
@@ -32,6 +32,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -64,6 +65,13 @@ type pendingScan struct {
 	campaignID int64
 	name       string
 	expires    time.Time
+}
+
+// geo is where a scan happened. Coordinates travel to the Cloud API so the
+// merchant dashboard can show them; they never reach a published receipt.
+type geo struct {
+	lat, lon  float64
+	accuracyM *float64
 }
 
 func envOr(k, def string) string {
@@ -209,7 +217,8 @@ func (s *scanner) onText(phone, body string) string {
 		s.setPending(phone, pendingScan{code: res.Code, campaignID: res.CampaignID, name: res.CampaignName, expires: time.Now().Add(10 * time.Minute)})
 		return "📍 Para validar tu escaneo, comparte tu ubicación:\n\nToca el clip 📎 → Ubicación → «Enviar tu ubicación actual»."
 	}
-	return s.recordShared(phone, res.CampaignID, res.Code, res.CampaignName, res.DiscountType, res.DiscountValue, evidence{Type: "whatsapp_scan", Policy: "scan-v1"})
+	return s.recordShared(phone, res.CampaignID, res.Code, res.CampaignName, res.DiscountType, res.DiscountValue,
+		evidence{Type: "whatsapp_scan", Policy: "scan-v1"}, nil)
 }
 
 // onLocation completes a pending gift scan with the shared location.
@@ -218,12 +227,20 @@ func (s *scanner) onLocation(phone, lat, lon string) string {
 	if !ok {
 		return "Recibimos tu ubicación, pero no hay ningún escaneo esperándola. Envía primero el código del QR."
 	}
-	// Raw coordinates stay in this layer (integrator layer): only a
-	// commitment reaches the signed receipt. journald keeps the raw pair.
 	log.Printf("geo-evidence phone=%s code=%s lat=%s lon=%s", phone, p.code, lat, lon)
+	// The commitment goes into the signed (publishable) receipt; the
+	// coordinates themselves go to the merchant's own dashboard.
 	h := sha256.Sum256([]byte(lat + "|" + lon + "|" + phone + "|" + p.code))
 	ev := evidence{Type: "whatsapp_scan_geo", Policy: "geo-v1", ContextHash: hex.EncodeToString(h[:])}
-	return s.recordShared(phone, p.campaignID, p.code, p.name, "", 0, ev)
+	var where *geo
+	flat, errLat := strconv.ParseFloat(lat, 64)
+	flon, errLon := strconv.ParseFloat(lon, 64)
+	if errLat == nil && errLon == nil {
+		where = &geo{lat: flat, lon: flon}
+	} else {
+		log.Printf("unparseable location from %s: lat=%q lon=%q", phone, lat, lon)
+	}
+	return s.recordShared(phone, p.campaignID, p.code, p.name, "", 0, ev, where)
 }
 
 // ── Cloud API calls ──────────────────────────────────────────────────
@@ -255,7 +272,7 @@ func (s *scanner) resolve(value string, asToken bool) (resolved, int, error) {
 	return out, status, err
 }
 
-func (s *scanner) recordShared(phone string, campaignID int64, code, name, discountType string, discountValue int64, ev evidence) string {
+func (s *scanner) recordShared(phone string, campaignID int64, code, name, discountType string, discountValue int64, ev evidence, where *geo) string {
 	payload := map[string]any{
 		"customer_ref": phone,
 		// order_ref implements "una vez por persona": the API deduplicates the
@@ -266,6 +283,13 @@ func (s *scanner) recordShared(phone string, campaignID int64, code, name, disco
 	}
 	if ev.ContextHash != "" {
 		payload["context_hash"] = ev.ContextHash
+	}
+	if where != nil {
+		loc := map[string]any{"lat": where.lat, "lon": where.lon}
+		if where.accuracyM != nil {
+			loc["accuracy_m"] = *where.accuracyM
+		}
+		payload["location"] = loc
 	}
 	var out map[string]any
 	status, err := s.api("POST", fmt.Sprintf("/v1/shared-codes/%d/%s/events", campaignID, url.PathEscape(code)), payload, &out)

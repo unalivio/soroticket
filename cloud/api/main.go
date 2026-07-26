@@ -55,6 +55,9 @@ func main() {
 	if err = runContractStampMigration(db); err != nil {
 		log.Fatal(err)
 	}
+	if err = runScanDetailMigration(db); err != nil {
+		log.Fatal(err)
+	}
 	s := &server{
 		db: db, kek: kek, refKey: refKey, locks: map[string]*sync.Mutex{},
 		loginAttempts: map[string]loginAttempt{}, rateWindows: map[string]rateWindow{},
@@ -90,6 +93,7 @@ func main() {
 
 	mux.HandleFunc("GET /v1/verify", auth(s.handleVerify))
 	mux.HandleFunc("GET /v1/codes/resolve", auth(s.handleResolveCode))
+	mux.HandleFunc("GET /v1/campaigns/{id}/scans", auth(s.handleListScans))
 	mux.HandleFunc("GET /v1/campaigns/{id}/qr", auth(s.handleCampaignQR))
 	mux.HandleFunc("GET /v1/campaigns/{id}/qr.png", auth(s.handleCampaignQRPNG))
 	mux.HandleFunc("POST /v1/redemptions", auth(s.idempotent("redemptions", s.handleRedeem)))

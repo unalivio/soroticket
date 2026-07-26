@@ -221,6 +221,13 @@ func (s *server) handleRecordEvents(w http.ResponseWriter, r *http.Request) {
 		EvidenceType  string `json:"evidence_type"`
 		ContextHash   string `json:"context_hash"`
 		PolicyVersion string `json:"policy_version"`
+		// Where the scan happened. Stored for the merchant's own dashboard and
+		// never published in the signed receipt (see docs/CLOUD.md §5).
+		Location *struct {
+			Lat       float64  `json:"lat"`
+			Lon       float64  `json:"lon"`
+			AccuracyM *float64 `json:"accuracy_m"`
+		} `json:"location"`
 	}
 	if err := readBody(r, &in); err != nil {
 		writeProblem(w, 400, err.Error())
@@ -253,9 +260,23 @@ func (s *server) handleRecordEvents(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, 400, "context_hash must be lowercase hex of at most 64 characters")
 		return
 	}
+	if in.Location != nil {
+		if in.Location.Lat < -90 || in.Location.Lat > 90 || in.Location.Lon < -180 || in.Location.Lon > 180 {
+			writeProblem(w, 400, "location.lat/lon are out of range")
+			return
+		}
+		if in.Location.AccuracyM != nil && (*in.Location.AccuracyM < 0 || *in.Location.AccuracyM > 1_000_000) {
+			writeProblem(w, 400, "location.accuracy_m is out of range")
+			return
+		}
+	}
 	domain := fmt.Sprintf("org:%d|env:%s|campaign:%d|code:%s", a.OrgID, a.Env, chainID, code)
 	custRef := s.opaqueRef(domain+"|customer", strings.TrimSpace(in.CustomerRef))
 	orderRef := s.opaqueRef(domain+"|order", strings.TrimSpace(in.OrderRef))
+	// Only the last four digits are kept, so the merchant can recognise a
+	// repeat customer and apply "once per person" without Cloud ever holding a
+	// phone book (docs/USE_CASES.md).
+	custTail := referenceTail(in.CustomerRef)
 	now := time.Now().Unix()
 	receipt, err := s.signReceipt(a.OrgID, a.Env, chainID, code, count, custRef, orderRef, now,
 		receiptEvidence{Type: in.EvidenceType, ContextHash: in.ContextHash, PolicyVersion: in.PolicyVersion})
@@ -292,8 +313,17 @@ func (s *server) handleRecordEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	res, err := tx.Exec(`INSERT INTO shared_events (shared_code_id, count, customer_ref, order_ref, created_at)
-	  VALUES (?,?,?,?,?)`, sharedID, count, custRef, orderRef, now)
+	var lat, lon, accuracy any
+	if in.Location != nil {
+		lat, lon = in.Location.Lat, in.Location.Lon
+		if in.Location.AccuracyM != nil {
+			accuracy = *in.Location.AccuracyM
+		}
+	}
+	res, err := tx.Exec(`INSERT INTO shared_events
+	  (shared_code_id, count, customer_ref, order_ref, created_at, customer_tail, lat, lon, accuracy_m, evidence_type)
+	  VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		sharedID, count, custRef, orderRef, now, nullIfEmpty(custTail), lat, lon, accuracy, nullIfEmpty(in.EvidenceType))
 	if err != nil {
 		writeProblem(w, 500, "could not record event")
 		return
@@ -313,7 +343,17 @@ func (s *server) handleRecordEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reservation.Commit()
-	s.logActivity(a, "event", code, fmt.Sprintf("+%d events recorded · %s", count, campName), "", &cid, 0)
+	// The feed says who and whether a position came with it — "+1 events
+	// recorded" repeated is unreadable once a campaign is live.
+	who := "sin identificar"
+	if custTail != "" {
+		who = "···" + custTail
+	}
+	where := ""
+	if in.Location != nil {
+		where = " · con ubicación"
+	}
+	s.logActivity(a, "event", code, fmt.Sprintf("Escaneo %s%s · %s", who, where, campName), "", &cid, 0)
 	response := map[string]any{
 		"ok": true,
 		"receipt": map[string]any{

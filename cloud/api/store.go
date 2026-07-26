@@ -148,6 +148,11 @@ CREATE TABLE IF NOT EXISTS shared_codes (
 );
 
 -- off-chain redemption events (the hot path)
+-- Operational columns (customer_tail, coordinates, evidence_type) exist so the
+-- merchant portal can answer "who scanned and from where" — the whole point of
+-- proof-of-delivery. They are deliberately NOT in the published signed receipt,
+-- which keeps carrying commitments only: the merchant sees its own scans, the
+-- public audit trail never exposes a customer's phone or position.
 CREATE TABLE IF NOT EXISTS shared_events (
   id INTEGER PRIMARY KEY,
   shared_code_id INTEGER NOT NULL REFERENCES shared_codes(id),
@@ -155,7 +160,12 @@ CREATE TABLE IF NOT EXISTS shared_events (
   customer_ref TEXT,             -- opaque hash or NULL
   order_ref TEXT,
   committed_period INTEGER,      -- NULL until anchored
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  customer_tail TEXT,            -- last 4 digits only; the full number is never stored
+  lat REAL,                      -- where the scan happened, when shared
+  lon REAL,
+  accuracy_m REAL,               -- GPS accuracy the device reported, when known
+  evidence_type TEXT             -- integrator-declared (e.g. whatsapp_scan_geo)
 );
 
 CREATE TABLE IF NOT EXISTS event_receipts (
@@ -436,6 +446,43 @@ func runSecurityMigrations(db *sql.DB, refKey []byte) error {
 		return fmt.Errorf("commit security migration: %w", err)
 	}
 	return nil
+}
+
+// runScanDetailMigration (version 3) adds the operational scan columns to
+// existing databases. Rows recorded before it keep NULLs: the portal shows
+// them as unknown rather than inventing a location or a phone.
+func runScanDetailMigration(db *sql.DB) error {
+	var applied int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE version=3`).Scan(&applied); err != nil {
+		return fmt.Errorf("read scan-detail migration state: %w", err)
+	}
+	if applied == 1 {
+		return nil
+	}
+	columns := map[string]string{
+		"customer_tail": "TEXT", "lat": "REAL", "lon": "REAL",
+		"accuracy_m": "REAL", "evidence_type": "TEXT",
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin scan-detail migration: %w", err)
+	}
+	defer tx.Rollback()
+	for name, kind := range columns {
+		var present int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('shared_events') WHERE name=?`, name).Scan(&present); err != nil {
+			return fmt.Errorf("inspect shared_events.%s: %w", name, err)
+		}
+		if present == 0 {
+			if _, err := tx.Exec(`ALTER TABLE shared_events ADD COLUMN ` + name + ` ` + kind); err != nil {
+				return fmt.Errorf("add shared_events.%s: %w", name, err)
+			}
+		}
+	}
+	if _, err := tx.Exec(`INSERT INTO schema_migrations (version,applied_at) VALUES (3,?)`, time.Now().Unix()); err != nil {
+		return fmt.Errorf("record scan-detail migration: %w", err)
+	}
+	return tx.Commit()
 }
 
 // runContractStampMigration (version 2) adds the per-campaign contract
