@@ -42,7 +42,8 @@ type config struct {
 	apiBase    string // Soroticket Cloud API (internal)
 	apiKey     string // sk_test_… — the org this scanner serves
 	publicURL  string // exact webhook URL Twilio signs (behind TLS proxy)
-	twilioAuth string // Twilio auth token; empty = dev mode (signature not enforced)
+	twilioAuth string // Twilio auth token; empty = signature not enforced
+	pathSecret string // shared secret required in the webhook path; empty = not required
 }
 
 type scanner struct {
@@ -79,12 +80,19 @@ func main() {
 		apiKey:     os.Getenv("SOROTICKET_API_KEY"),
 		publicURL:  envOr("SCANNER_PUBLIC_URL", ""),
 		twilioAuth: os.Getenv("TWILIO_AUTH_TOKEN"),
+		pathSecret: os.Getenv("SCANNER_PATH_SECRET"),
 	}
 	if cfg.apiKey == "" {
 		log.Fatal("SOROTICKET_API_KEY is required (sk_test_… of the org this scanner serves)")
 	}
+	// Two independent gates; either one keeps strangers from injecting scans.
+	// The Twilio signature is stronger (it proves who signed each request); the
+	// path secret needs no Twilio credentials on this host.
+	if cfg.twilioAuth == "" && cfg.pathSecret == "" {
+		log.Print("WARNING: neither TWILIO_AUTH_TOKEN nor SCANNER_PATH_SECRET is set — the webhook is UNAUTHENTICATED (dev only)")
+	}
 	if cfg.twilioAuth == "" {
-		log.Print("WARNING: TWILIO_AUTH_TOKEN unset — webhook signatures are NOT enforced (dev only)")
+		log.Print("note: TWILIO_AUTH_TOKEN unset — request signatures are not verified")
 	}
 	s := &scanner{
 		cfg:     cfg,
@@ -98,7 +106,10 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"ok":true,"service":"soroticket-scanner"}`))
 	})
+	// The bare path stays registered so a misconfigured Twilio sender fails
+	// loudly (403 + log) instead of silently dropping scans.
 	mux.HandleFunc("POST /bot/whatsapp/webhook", s.handleWebhook)
+	mux.HandleFunc("POST /bot/whatsapp/webhook/{secret}", s.handleWebhook)
 	log.Printf("soroticket-scanner listening on %s (api %s)", cfg.listen, cfg.apiBase)
 	log.Fatal(http.ListenAndServe(cfg.listen, mux))
 }
@@ -110,7 +121,13 @@ func (s *scanner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", 400)
 		return
 	}
+	if !s.validPathSecret(r) {
+		log.Printf("rejected webhook: bad or missing path secret (from %s)", r.RemoteAddr)
+		http.Error(w, "not found", 404)
+		return
+	}
 	if !s.validSignature(r) {
+		log.Printf("rejected webhook: invalid Twilio signature (from %s)", r.RemoteAddr)
 		http.Error(w, "invalid signature", 403)
 		return
 	}
@@ -302,6 +319,18 @@ func discountCopy(name, discountType string, value int64) string {
 }
 
 // ── plumbing ─────────────────────────────────────────────────────────
+
+// validPathSecret requires the configured secret as the last path segment.
+// Compared in constant time; answers 404 (not 403) so probing the bare path
+// cannot distinguish "wrong secret" from "no such endpoint".
+func (s *scanner) validPathSecret(r *http.Request) bool {
+	if s.cfg.pathSecret == "" {
+		return true
+	}
+	got := r.PathValue("secret")
+	return len(got) == len(s.cfg.pathSecret) &&
+		hmac.Equal([]byte(got), []byte(s.cfg.pathSecret))
+}
 
 // validSignature checks X-Twilio-Signature: base64(HMAC-SHA1(token,
 // publicURL + concat(sorted(param+value)))). Dev mode (no token) accepts all.
