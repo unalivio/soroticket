@@ -37,7 +37,7 @@ function QRPanel({ c }) {
           <div>
             <div className="eyebrow" style={{ fontSize: 11 }}>Un solo QR para todas las unidades</div>
             <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "6px 0 0", lineHeight: 1.55 }}>
-              Pegalo en la botella, la mesa o el volante. La cámara del teléfono abre WhatsApp
+              Pégalo en la botella, la mesa o el volante. La cámara del teléfono abre WhatsApp
               con el mensaje cargado — el cliente solo aprieta enviar.
             </p>
           </div>
@@ -58,12 +58,12 @@ function QRPanel({ c }) {
       <div className="card" style={{ padding: "18px 20px", flex: "0 1 300px", display: "flex", flexDirection: "column", gap: 10 }}>
         <div className="eyebrow" style={{ fontSize: 11 }}>Antes de mandarlo a imprenta</div>
         <p style={{ fontSize: 13, color: "var(--ink-2)", margin: 0, lineHeight: 1.55 }}>
-          Escaneá este QR con tu propio teléfono y completá el flujo una vez. Si el día del
+          Escanea este QR con tu propio teléfono y completa el flujo una vez. Si el día del
           evento hay gente esperando, no es el momento de descubrir que algo no estaba conectado.
         </p>
         <p style={{ fontSize: 13, color: "var(--ink-2)", margin: 0, lineHeight: 1.55 }}>
           Bot de WhatsApp: <span className="mono">+{qr.wa_number}</span> — lo provee Soroticket,
-          no tenés que configurar nada.
+          no tienes que configurar nada.
         </p>
       </div>
     </div>

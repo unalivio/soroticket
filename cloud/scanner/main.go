@@ -147,7 +147,7 @@ func (s *scanner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	case body != "":
 		reply(w, s.onText(phone, body))
 	default:
-		reply(w, "Enviá el código de tu cupón o entrada 🎟️")
+		reply(w, "Envía el código de tu cupón o entrada 🎟️")
 	}
 }
 
@@ -168,7 +168,7 @@ func (s *scanner) onText(phone, body string) string {
 		code = codePattern.FindString(upper)
 	}
 	if code == "" {
-		return "🤔 No reconocimos ningún código en tu mensaje. Escaneá el QR o escribí el código tal como aparece."
+		return "🤔 No reconocimos ningún código en tu mensaje. Escanea el QR o escribe el código tal como aparece."
 	}
 	res, status, err := s.resolve(code, token != "")
 	// A token-shaped string that no campaign knows may still be a typed code:
@@ -178,18 +178,24 @@ func (s *scanner) onText(phone, body string) string {
 	}
 	if err != nil {
 		log.Printf("resolve %q: %v", code, err)
-		return "Tuvimos un problema técnico. Probá de nuevo en un momento."
+		return "Tuvimos un problema técnico. Intenta de nuevo en un momento."
 	}
 	switch {
 	case status == 404:
 		if token != "" {
-			return "🤔 Este QR no está activo. Puede ser de una promo que ya terminó — preguntá en el local."
+			return "🤔 Este QR no está activo. Puede ser de una promo que ya terminó — pregunta en el local."
 		}
-		return fmt.Sprintf("🤔 El código %s no existe. Revisá que esté escrito exactamente como aparece.", code)
+		// codePattern also matches ordinary words ("hola"), so a plain-letter
+		// miss is far more likely to be conversation than a mistyped code:
+		// don't tell someone their greeting is an invalid coupon.
+		if !strings.ContainsAny(code, "0123456789-") {
+			return "👋 ¡Hola! Escanea el QR de la promoción o envía el código exactamente como aparece."
+		}
+		return fmt.Sprintf("🤔 El código %s no existe. Revisa que esté escrito exactamente como aparece.", code)
 	case res.Archived:
 		return fmt.Sprintf("Esta promo (%s) ya no está activa.", res.CampaignName)
 	case res.Expired:
-		return fmt.Sprintf("⏰ %s venció. Preguntá en el local por la promo vigente.", res.CampaignName)
+		return fmt.Sprintf("⏰ %s venció. Pregunta en el local por la promo vigente.", res.CampaignName)
 	}
 
 	if res.Type == "unique" {
@@ -201,7 +207,7 @@ func (s *scanner) onText(phone, body string) string {
 	if res.Kind == "gift" {
 		// proof-of-delivery needs the second factor: real device location
 		s.setPending(phone, pendingScan{code: res.Code, campaignID: res.CampaignID, name: res.CampaignName, expires: time.Now().Add(10 * time.Minute)})
-		return "📍 Para validar tu escaneo, compartí tu ubicación:\n\nTocá el clip 📎 → Ubicación → «Enviar tu ubicación actual»."
+		return "📍 Para validar tu escaneo, comparte tu ubicación:\n\nToca el clip 📎 → Ubicación → «Enviar tu ubicación actual»."
 	}
 	return s.recordShared(phone, res.CampaignID, res.Code, res.CampaignName, res.DiscountType, res.DiscountValue, evidence{Type: "whatsapp_scan", Policy: "scan-v1"})
 }
@@ -210,7 +216,7 @@ func (s *scanner) onText(phone, body string) string {
 func (s *scanner) onLocation(phone, lat, lon string) string {
 	p, ok := s.takePending(phone)
 	if !ok {
-		return "Recibimos tu ubicación, pero no hay ningún escaneo esperándola. Enviá primero el código del QR."
+		return "Recibimos tu ubicación, pero no hay ningún escaneo esperándola. Envía primero el código del QR."
 	}
 	// Raw coordinates stay in this layer (integrator layer): only a
 	// commitment reaches the signed receipt. journald keeps the raw pair.
@@ -266,16 +272,16 @@ func (s *scanner) recordShared(phone string, campaignID int64, code, name, disco
 	switch {
 	case err != nil:
 		log.Printf("record event %s: %v", code, err)
-		return "Tuvimos un problema técnico registrando tu escaneo. Probá de nuevo."
+		return "Tuvimos un problema técnico registrando tu escaneo. Intenta de nuevo."
 	case status == 409:
 		s.markDone(phone, code)
 		return "Ya usaste este código — es una vez por persona. 😉"
 	case status != 201:
 		log.Printf("record event %s: unexpected status %d: %v", code, status, out)
-		return "No pudimos registrar el escaneo. Probá de nuevo en un momento."
+		return "No pudimos registrar el escaneo. Intenta de nuevo en un momento."
 	}
 	s.markDone(phone, code)
-	return "✓ Registrado — " + discountCopy(name, discountType, discountValue) + "\n\nMostrá este mensaje en el mostrador si te lo piden."
+	return "✓ Registrado — " + discountCopy(name, discountType, discountValue) + "\n\nMuestra este mensaje en el mostrador si te lo piden."
 }
 
 func (s *scanner) redeemUnique(phone string, res resolved) string {
@@ -285,7 +291,7 @@ func (s *scanner) redeemUnique(phone string, res resolved) string {
 	switch {
 	case err != nil:
 		log.Printf("redeem %s: %v", res.Code, err)
-		return "Tuvimos un problema técnico validando el código. Probá de nuevo."
+		return "Tuvimos un problema técnico validando el código. Intenta de nuevo."
 	case status == 201:
 		return fmt.Sprintf("✅ VÁLIDO — %s\n%s · recién marcado como usado.", res.CampaignName, res.Code)
 	}
@@ -333,9 +339,9 @@ func (s *scanner) api(method, path string, body any, out any) (int, error) {
 func discountCopy(name, discountType string, value int64) string {
 	switch discountType {
 	case "percentage":
-		return fmt.Sprintf("tenés %d%% de descuento (%s).", value, name)
+		return fmt.Sprintf("tienes %d%% de descuento (%s).", value, name)
 	case "fixed_amount":
-		return fmt.Sprintf("tenés %d de descuento (%s).", value, name)
+		return fmt.Sprintf("tienes %d de descuento (%s).", value, name)
 	default:
 		return "«" + name + "»."
 	}
