@@ -151,21 +151,40 @@ func (s *scanner) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// scanTokenPattern matches the opaque token a printed QR carries (see
+// cloud/api/handlers_qr.go). Checked before codePattern because the prefilled
+// WhatsApp text may also contain surrounding words.
+var scanTokenPattern = regexp.MustCompile(`\bST[A-Z0-9]{14}\b`)
+
 var codePattern = regexp.MustCompile(`[A-Z0-9][A-Z0-9\-]{2,63}`)
 
-// onText resolves the scanned/typed code and runs the right path.
+// onText resolves the scan token (from a printed QR) or a typed code and runs
+// the right path.
 func (s *scanner) onText(phone, body string) string {
-	code := codePattern.FindString(strings.ToUpper(body))
+	upper := strings.ToUpper(body)
+	token := scanTokenPattern.FindString(upper)
+	code := token
+	if token == "" {
+		code = codePattern.FindString(upper)
+	}
 	if code == "" {
 		return "🤔 No reconocimos ningún código en tu mensaje. Escaneá el QR o escribí el código tal como aparece."
 	}
-	res, status, err := s.resolve(code)
+	res, status, err := s.resolve(code, token != "")
+	// A token-shaped string that no campaign knows may still be a typed code:
+	// retry as a code before telling the customer it does not exist.
+	if token != "" && status == 404 {
+		res, status, err = s.resolve(code, false)
+	}
 	if err != nil {
 		log.Printf("resolve %q: %v", code, err)
 		return "Tuvimos un problema técnico. Probá de nuevo en un momento."
 	}
 	switch {
 	case status == 404:
+		if token != "" {
+			return "🤔 Este QR no está activo. Puede ser de una promo que ya terminó — preguntá en el local."
+		}
 		return fmt.Sprintf("🤔 El código %s no existe. Revisá que esté escrito exactamente como aparece.", code)
 	case res.Archived:
 		return fmt.Sprintf("Esta promo (%s) ya no está activa.", res.CampaignName)
@@ -220,9 +239,13 @@ type evidence struct {
 	Type, Policy, ContextHash string
 }
 
-func (s *scanner) resolve(code string) (resolved, int, error) {
+func (s *scanner) resolve(value string, asToken bool) (resolved, int, error) {
+	param := "code"
+	if asToken {
+		param = "token"
+	}
 	var out resolved
-	status, err := s.api("GET", "/v1/codes/resolve?code="+url.QueryEscape(code), nil, &out)
+	status, err := s.api("GET", "/v1/codes/resolve?"+param+"="+url.QueryEscape(value), nil, &out)
 	return out, status, err
 }
 

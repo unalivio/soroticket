@@ -302,6 +302,22 @@ CREATE TABLE IF NOT EXISTS idempotency_v2 (
   PRIMARY KEY (key, org_id, env, endpoint)
 );
 
+-- Opaque scan tokens: what a printed QR actually carries. The token reveals
+-- nothing about the campaign or the code (a customer reading the QR learns
+-- nothing), it is short enough to keep printed QR density low, and it can be
+-- revoked without reprinting anything else.
+CREATE TABLE IF NOT EXISTS scan_tokens (
+  token TEXT PRIMARY KEY,
+  org_id INTEGER NOT NULL,
+  env TEXT NOT NULL,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id),
+  code TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  revoked_at INTEGER,
+  UNIQUE (campaign_id, code, revoked_at)
+);
+CREATE INDEX IF NOT EXISTS idx_scan_tokens_code ON scan_tokens(campaign_id, code);
+
 CREATE TABLE IF NOT EXISTS webhooks (
   id INTEGER PRIMARY KEY,
   org_id INTEGER NOT NULL REFERENCES orgs(id),

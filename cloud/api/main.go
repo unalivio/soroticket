@@ -90,6 +90,8 @@ func main() {
 
 	mux.HandleFunc("GET /v1/verify", auth(s.handleVerify))
 	mux.HandleFunc("GET /v1/codes/resolve", auth(s.handleResolveCode))
+	mux.HandleFunc("GET /v1/campaigns/{id}/qr", auth(s.handleCampaignQR))
+	mux.HandleFunc("GET /v1/campaigns/{id}/qr.png", auth(s.handleCampaignQRPNG))
 	mux.HandleFunc("POST /v1/redemptions", auth(s.idempotent("redemptions", s.handleRedeem)))
 	mux.HandleFunc("GET /v1/redemptions", auth(s.handleListRedemptions))
 

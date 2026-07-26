@@ -877,6 +877,95 @@ func TestResolveCodeRoutesSharedThenUniqueWithinOrg(t *testing.T) {
 	}
 }
 
+func TestScanTokenIsOpaqueStableAndResolvable(t *testing.T) {
+	t.Setenv("SOROTICKET_WA_NUMBER", "19713902577")
+	s := testServer(t)
+	if _, err := s.db.Exec(`INSERT INTO orgs (id,name,created_at) VALUES (7,'test',0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO campaigns
+	  (id,org_id,env,chain_id,contract_id,kind,name,discount_type,discount_value,total_supply,valid_until,created_at)
+	  VALUES (1,7,'test',41,'`+currentContractID+`','gift','Copas','free_item',1,100,9999999999,0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.Exec(`INSERT INTO shared_codes (id,campaign_id,code,payout_rate,created_at) VALUES (1,1,'COPA-ROSALES','0',0)`); err != nil {
+		t.Fatal(err)
+	}
+
+	get := func(path string) (int, map[string]any) {
+		r := authedRequest(http.MethodGet, path, "", "", "test")
+		r.SetPathValue("id", "1")
+		w := httptest.NewRecorder()
+		s.handleCampaignQR(w, r)
+		var body map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &body)
+		return w.Code, body
+	}
+	code, body := get("/v1/campaigns/1/qr")
+	if code != 200 {
+		t.Fatalf("qr status=%d body=%v", code, body)
+	}
+	token, _ := body["scan_token"].(string)
+	if !strings.HasPrefix(token, "ST") || len(token) != 16 {
+		t.Fatalf("unexpected token shape: %q", token)
+	}
+	// the QR must not leak the campaign or the code
+	if strings.Contains(token, "COPA") || strings.Contains(token, "ROSALES") {
+		t.Fatalf("token leaks the code: %q", token)
+	}
+	link, _ := body["deep_link"].(string)
+	if !strings.HasPrefix(link, "https://wa.me/19713902577?text=") || !strings.Contains(link, token) {
+		t.Fatalf("unexpected deep link: %q", link)
+	}
+	if strings.Contains(link, "COPA-ROSALES") {
+		t.Fatalf("deep link leaks the code: %q", link)
+	}
+
+	// stable: every bottle carries the same printed QR, so asking again must
+	// return the same token
+	if _, again := get("/v1/campaigns/1/qr"); again["scan_token"] != token {
+		t.Fatalf("token changed between calls: %v vs %v", again["scan_token"], token)
+	}
+
+	// resolvable back to the code, and unknown tokens 404
+	r := authedRequest(http.MethodGet, "/v1/codes/resolve?token="+token, "", "", "test")
+	w := httptest.NewRecorder()
+	s.handleResolveCode(w, r)
+	var out map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	if w.Code != 200 || out["code"] != "COPA-ROSALES" || out["type"] != "shared" {
+		t.Fatalf("resolve by token: %d %v", w.Code, out)
+	}
+	r = authedRequest(http.MethodGet, "/v1/codes/resolve?token=STZZZZZZZZZZZZZZ", "", "", "test")
+	w = httptest.NewRecorder()
+	s.handleResolveCode(w, r)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("unknown token should 404, got %d", w.Code)
+	}
+
+	// PNG renders and is a real PNG
+	r = authedRequest(http.MethodGet, "/v1/campaigns/1/qr.png", "", "", "test")
+	r.SetPathValue("id", "1")
+	w = httptest.NewRecorder()
+	s.handleCampaignQRPNG(w, r)
+	if w.Code != 200 || w.Header().Get("Content-Type") != "image/png" ||
+		!bytes.HasPrefix(w.Body.Bytes(), []byte("\x89PNG\r\n\x1a\n")) {
+		t.Fatalf("qr.png status=%d type=%q len=%d", w.Code, w.Header().Get("Content-Type"), w.Body.Len())
+	}
+}
+
+func TestQREndpointFailsClosedWithoutBotNumber(t *testing.T) {
+	t.Setenv("SOROTICKET_WA_NUMBER", "")
+	s := testServer(t)
+	r := authedRequest(http.MethodGet, "/v1/campaigns/1/qr", "", "", "test")
+	r.SetPathValue("id", "1")
+	w := httptest.NewRecorder()
+	s.handleCampaignQR(w, r)
+	if w.Code != http.StatusNotImplemented {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestLegacyContractRowsFailClosedOnChainOperations(t *testing.T) {
 	s := testServer(t)
 	if _, err := s.db.Exec(`INSERT INTO orgs (id,name,created_at) VALUES (7,'test',0)`); err != nil {

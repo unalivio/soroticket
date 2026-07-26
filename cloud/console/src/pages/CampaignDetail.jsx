@@ -6,6 +6,70 @@ import { kindTag, statusOf } from "./Campaigns.jsx";
 
 const isUniqueKind = (k) => k === "voucher" || k === "ticket" || k === "loyalty";
 
+/* ── The printed QR ─────────────────────────────────────────────────
+   Scanning it with the phone camera opens WhatsApp with the message ready:
+   the customer only presses send. The QR carries an opaque token, never the
+   coupon code, so reading it with any scanner app reveals nothing. */
+function QRPanel({ c }) {
+  const { toast, toastErr } = useApp();
+  const [qr, setQr] = useState(null);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    setQr(null); setErr(null);
+    api.get(`/v1/campaigns/${c.id}/qr`).then(setQr).catch(setErr);
+  }, [c.id]);
+
+  if (err) return <div className="card" style={{ padding: 24 }}><ErrText err={err} /></div>;
+  if (!qr) return <div className="card" style={{ padding: 24 }}><div className="faint">Generando el QR…</div></div>;
+
+  const pngURL = `/api/v1/campaigns/${c.id}/qr.png?code=${encodeURIComponent(qr.code)}`;
+  const copy = async (text, what) => {
+    try { await navigator.clipboard.writeText(text); toast("Copiado", what); } catch (e) { toastErr(e); }
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div className="card" style={{ padding: 24, display: "flex", gap: 22, alignItems: "flex-start", flex: "1 1 460px" }}>
+        <img src={pngURL} alt={`QR de ${qr.code}`} width={190} height={190}
+          style={{ imageRendering: "pixelated", borderRadius: 12, border: "1px solid var(--line)", background: "#fff", padding: 8, flex: "none" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+          <div>
+            <div className="eyebrow" style={{ fontSize: 11 }}>Un solo QR para todas las unidades</div>
+            <p style={{ fontSize: 13.5, color: "var(--ink-2)", margin: "6px 0 0", lineHeight: 1.55 }}>
+              Pegalo en la botella, la mesa o el volante. La cámara del teléfono abre WhatsApp
+              con el mensaje cargado — el cliente solo aprieta enviar.
+            </p>
+          </div>
+          <div className="mono" style={{ fontSize: 11.5, background: "var(--surface-inset)", border: "1px solid var(--line)", borderRadius: 10, padding: "9px 11px", wordBreak: "break-all" }}>
+            {qr.deep_link}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <a className="btn-plain" style={{ fontSize: 13, textDecoration: "none" }} href={pngURL} download={`soroticket-${qr.code.toLowerCase()}.png`}>Descargar QR</a>
+            <button className="btn-plain" style={{ fontSize: 13 }} onClick={() => copy(qr.deep_link, "El link de WhatsApp está en tu portapapeles.")}>Copiar link</button>
+            <a className="btn-plain" style={{ fontSize: 13, textDecoration: "none" }} href={qr.deep_link} target="_blank" rel="noreferrer">Probarlo yo</a>
+          </div>
+          <span className="help">
+            El QR lleva un identificador opaco (<span className="mono">{qr.scan_token}</span>), no el código
+            <span className="mono"> {qr.code}</span>: quien lea el QR no ve de qué promo se trata.
+          </span>
+        </div>
+      </div>
+      <div className="card" style={{ padding: "18px 20px", flex: "0 1 300px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="eyebrow" style={{ fontSize: 11 }}>Antes de mandarlo a imprenta</div>
+        <p style={{ fontSize: 13, color: "var(--ink-2)", margin: 0, lineHeight: 1.55 }}>
+          Escaneá este QR con tu propio teléfono y completá el flujo una vez. Si el día del
+          evento hay gente esperando, no es el momento de descubrir que algo no estaba conectado.
+        </p>
+        <p style={{ fontSize: 13, color: "var(--ink-2)", margin: 0, lineHeight: 1.55 }}>
+          Bot de WhatsApp: <span className="mono">+{qr.wa_number}</span> — lo provee Soroticket,
+          no tenés que configurar nada.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function CampaignDetailPage({ id }) {
   const { env, nav, toast, toastErr } = useApp();
   const [data, setData] = useState(null);
@@ -98,7 +162,7 @@ export function CampaignDetailPage({ id }) {
 
       {/* tabs */}
       <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--line)" }}>
-        {[["codes", unique ? "Codes" : "Shared code"], ["settlement", "Settlement"], ["activity", "Activity"]].map(([k, label]) => {
+        {[["codes", unique ? "Codes" : "Shared code"], ...(shared ? [["qr", "QR de WhatsApp"]] : []), ["settlement", "Settlement"], ["activity", "Activity"]].map(([k, label]) => {
           const disabled = k === "settlement" && !c.attributed_to;
           return (
             <span key={k} onClick={() => !disabled && (k === "settlement" ? nav("/settlements") : setTab(k))} style={{
@@ -172,6 +236,8 @@ export function CampaignDetailPage({ id }) {
           </div>
         </div>
       )}
+
+      {tab === "qr" && <QRPanel c={c} />}
 
       {tab === "activity" && <ActivityList campaignID={c.id} />}
 

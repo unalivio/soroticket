@@ -7,6 +7,7 @@ require (
 	github.com/stellar/go-stellar-sdk v0.6.0
 	golang.org/x/crypto v0.45.0
 	modernc.org/sqlite v1.34.4
+	rsc.io/qr v0.2.0
 )
 
 require (

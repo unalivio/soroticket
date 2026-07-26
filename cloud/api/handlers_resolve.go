@@ -16,8 +16,26 @@ import (
 func (s *server) handleResolveCode(w http.ResponseWriter, r *http.Request) {
 	a := authFrom(r)
 	code := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("code")))
+	// A scan surface sends the opaque token printed in the QR; translate it to
+	// its code first so everything below is identical for both entry points.
+	if token := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("token"))); token != "" {
+		if len(token) > maxCodeLen {
+			writeProblem(w, 400, "token is too long")
+			return
+		}
+		_, resolved, err := s.resolveScanToken(a, token)
+		if errors.Is(err, sql.ErrNoRows) {
+			writeProblem(w, 404, "unknown scan token")
+			return
+		}
+		if err != nil {
+			writeInternal(w, err, "resolve scan token")
+			return
+		}
+		code = resolved
+	}
 	if code == "" || len(code) > maxCodeLen {
-		writeProblem(w, 400, "code is required (1-64 bytes)")
+		writeProblem(w, 400, "code or token is required (1-64 bytes)")
 		return
 	}
 	now := time.Now().Unix()
