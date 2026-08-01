@@ -18,3 +18,8 @@ secrets/
 
 # Design/product sources kept out of the repo (deliberate)
 *.pdf
+
+# Root landing build and Cloudflare tooling
+/node_modules/
+/dist/
+/.wrangler/
