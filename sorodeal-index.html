@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#232323">
   <meta name="description" content="We create and launch coupons, vouchers, tickets and loyalty programs for your business, with a simple experience through WhatsApp.">
+  <link rel="icon" type="image/svg+xml" href="assets/soroticket/logo.svg">
   <title>Soroticket | Coupons, vouchers and loyalty through WhatsApp</title>
   <style>
     @font-face { font-family: Inter; src: url("assets/soroticket/fonts/inter-400.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
@@ -65,10 +66,10 @@
     .button-ghost { color: var(--ink); background: transparent; }
     .button-arrow::after { content: "→"; margin-left: 10px; font: 600 1.15rem/1 Inter, sans-serif; }
 
-    .site-header { position: sticky; top: 0; z-index: 100; height: 89px; background: rgba(255,255,255,.93); border-bottom: 1px solid rgba(226,232,240,.72); backdrop-filter: blur(18px); }
+    .site-header { position: sticky; top: 0; z-index: 100; height: 96px; background: rgba(255,255,255,.93); border-bottom: 1px solid rgba(226,232,240,.72); backdrop-filter: blur(18px); }
     .header-inner { display: flex; height: 100%; align-items: center; justify-content: space-between; gap: 28px; }
-    .brand { display: inline-flex; align-items: center; color: var(--ink); font: 700 1.25rem/1 Inter, Arial, sans-serif; letter-spacing: -.04em; }
-    .brand-mark { display: inline-grid; width: 34px; height: 34px; margin-right: 10px; place-items: center; color: var(--white); background: var(--ink); border-radius: 11px; font-size: .83rem; letter-spacing: -.06em; }
+    .brand { display: inline-flex; width: 66px; height: 48px; flex: 0 0 66px; align-items: center; }
+    .brand-logo { width: 66px; height: 48px; object-fit: contain; }
     .nav { display: flex; align-items: center; gap: 28px; color: var(--ink); font-size: .82rem; font-weight: 500; }
     .nav a { position: relative; white-space: nowrap; }
     .nav a:not(.button)::after { position: absolute; right: 0; bottom: -7px; left: 0; height: 2px; background: var(--purple); content: ""; transform: scaleX(0); transition: transform .2s ease; }
@@ -236,6 +237,7 @@
     .footer-grid { display: grid; grid-template-columns: 1.45fr repeat(3, .7fr); gap: 70px; }
     .footer-brand { max-width: 360px; }
     .footer-brand .brand { margin-bottom: 18px; color: var(--white); }
+    .footer-brand .brand-logo { filter: brightness(0) invert(1); opacity: .96; }
     .footer-col { display: grid; align-content: start; gap: 12px; }
     .footer-col strong { margin-bottom: 4px; color: var(--white); }
     .footer-col a:hover { color: var(--white); }
@@ -314,7 +316,7 @@
 
   <header class="site-header">
     <div class="shell header-inner">
-      <a class="brand" href="#inicio" aria-label="Soroticket, inicio"><span class="brand-mark">St</span>Soroticket</a>
+      <a class="brand" href="#inicio" aria-label="Soroticket, inicio"><img class="brand-logo" src="assets/soroticket/logo.svg" alt="Soroticket"></a>
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Abrir navegación">
         <span></span><span></span><span></span>
       </button>
@@ -543,7 +545,7 @@
   <footer class="site-footer">
     <div class="shell">
       <div class="footer-grid">
-        <div class="footer-brand"><a class="brand" href="#inicio"><span class="brand-mark">St</span>Soroticket</a><p>Soroticket hace que crear, entregar y seguir un beneficio sea más sencillo.</p></div>
+        <div class="footer-brand"><a class="brand" href="#inicio" aria-label="Soroticket, inicio"><img class="brand-logo" src="assets/soroticket/logo.svg" alt="Soroticket"></a><p>Soroticket hace que crear, entregar y seguir un beneficio sea más sencillo.</p></div>
         <div class="footer-col"><strong>Soluciones</strong><a href="#soluciones">Qué puedes crear</a><a href="#como-funciona">Cómo funciona</a><a href="#whatsapp">WhatsApp</a></div>
         <div class="footer-col"><strong>Empresa</strong><a href="#empresa">Para tu empresa</a><a href="#preguntas">Preguntas frecuentes</a><a href="#contacto">Contacto</a></div>
         <div class="footer-col"><strong>Legal</strong><a href="#">Privacidad</a><a href="#">Términos</a><span class="status">Preview / testnet</span></div>
