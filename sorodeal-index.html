@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#232323">
+  <meta name="description" content="We create and launch coupons, vouchers, tickets and loyalty programs for your business, with a simple experience through WhatsApp.">
+  <title>Soroticket | Coupons, vouchers and loyalty through WhatsApp</title>
+  <style>
+    @font-face { font-family: Inter; src: url("assets/soroticket/fonts/inter-400.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
+    @font-face { font-family: Inter; src: url("assets/soroticket/fonts/inter-500.ttf") format("truetype"); font-style: normal; font-weight: 500; font-display: swap; }
+    @font-face { font-family: Inter; src: url("assets/soroticket/fonts/inter-600.ttf") format("truetype"); font-style: normal; font-weight: 600; font-display: swap; }
+    @font-face { font-family: Inter; src: url("assets/soroticket/fonts/inter-700.ttf") format("truetype"); font-style: normal; font-weight: 700; font-display: swap; }
+    @font-face { font-family: Poppins; src: url("assets/soroticket/fonts/poppins-400.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
+    @font-face { font-family: Poppins; src: url("assets/soroticket/fonts/poppins-500.ttf") format("truetype"); font-style: normal; font-weight: 500; font-display: swap; }
+    @font-face { font-family: Poppins; src: url("assets/soroticket/fonts/poppins-600.ttf") format("truetype"); font-style: normal; font-weight: 600; font-display: swap; }
+    @font-face { font-family: Poppins; src: url("assets/soroticket/fonts/poppins-700.ttf") format("truetype"); font-style: normal; font-weight: 700; font-display: swap; }
+
+    :root {
+      --ink: #232323;
+      --title: #323435;
+      --copy: #464849;
+      --muted: #6f7477;
+      --line: #e2e8f0;
+      --surface: #f8fafb;
+      --hero: #ecf1f4;
+      --lavender: #b5b4ff;
+      --purple: #8786ff;
+      --blue: #beebff;
+      --pink: #fae3ff;
+      --peach: #ffe6bf;
+      --white: #fff;
+      --radius: 24px;
+      --shadow: 0 18px 55px rgba(35, 35, 35, .1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 96px; }
+    body { margin: 0; color: var(--copy); background: var(--white); font: 400 16px/1.6 Poppins, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    body.menu-open { overflow: hidden; }
+    img { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    h1, h2, h3, p { margin-top: 0; overflow-wrap: anywhere; }
+    h1, h2 { color: var(--title); font-family: Inter, Arial, sans-serif; letter-spacing: -.035em; }
+    h1 { margin-bottom: 20px; font-size: clamp(2.8rem, 4.5vw, 4.5rem); line-height: 1.08; }
+    h2 { margin-bottom: 20px; font-size: clamp(2.2rem, 3.3vw, 3.5rem); line-height: 1.12; }
+    h3 { margin-bottom: 12px; color: var(--title); font-size: 1.18rem; line-height: 1.35; }
+    p { margin-bottom: 0; }
+    :focus-visible { outline: 3px solid var(--purple); outline-offset: 4px; }
+
+    .skip-link { position: fixed; top: 12px; left: 12px; z-index: 1000; padding: 10px 16px; color: var(--white); background: var(--ink); border-radius: 8px; transform: translateY(-150%); }
+    .skip-link:focus { transform: translateY(0); }
+    .shell { width: min(100% - 40px, 1280px); margin-inline: auto; }
+    .section { position: relative; overflow: clip; padding: 96px 0; }
+    .eyebrow { margin-bottom: 14px; color: var(--purple); font: 700 .8rem/1.3 Inter, Arial, sans-serif; letter-spacing: .075em; text-transform: uppercase; }
+    .eyebrow.badge { display: inline-flex; padding: 7px 16px; color: var(--title); background: var(--lavender); border-radius: 8px; }
+    .section-copy { max-width: 680px; font-family: Inter, Arial, sans-serif; }
+    .section-copy p + p { margin-top: 16px; }
+    .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 28px; }
+    .button { display: inline-flex; min-height: 52px; align-items: center; justify-content: center; padding: 13px 24px; border: 1px solid var(--ink); border-radius: 12px; font-weight: 600; transition: transform .2s ease, background .2s ease, color .2s ease, box-shadow .2s ease; }
+    .button:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(35,35,35,.12); }
+    .button-dark { color: var(--white); background: var(--ink); }
+    .button-light { color: var(--ink); background: var(--white); }
+    .button-ghost { color: var(--ink); background: transparent; }
+    .button-arrow::after { content: "→"; margin-left: 10px; font: 600 1.15rem/1 Inter, sans-serif; }
+
+    .site-header { position: sticky; top: 0; z-index: 100; height: 89px; background: rgba(255,255,255,.93); border-bottom: 1px solid rgba(226,232,240,.72); backdrop-filter: blur(18px); }
+    .header-inner { display: flex; height: 100%; align-items: center; justify-content: space-between; gap: 28px; }
+    .brand { display: inline-flex; align-items: center; color: var(--ink); font: 700 1.25rem/1 Inter, Arial, sans-serif; letter-spacing: -.04em; }
+    .brand-mark { display: inline-grid; width: 34px; height: 34px; margin-right: 10px; place-items: center; color: var(--white); background: var(--ink); border-radius: 11px; font-size: .83rem; letter-spacing: -.06em; }
+    .nav { display: flex; align-items: center; gap: 28px; color: var(--ink); font-size: .82rem; font-weight: 500; }
+    .nav a { position: relative; white-space: nowrap; }
+    .nav a:not(.button)::after { position: absolute; right: 0; bottom: -7px; left: 0; height: 2px; background: var(--purple); content: ""; transform: scaleX(0); transition: transform .2s ease; }
+    .nav a:hover::after { transform: scaleX(1); }
+    .nav .button { min-height: 42px; padding: 9px 18px; }
+    .language-switch { display: inline-flex; padding: 3px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+    .language-switch button { min-width: 34px; height: 30px; padding: 0 8px; color: var(--muted); background: transparent; border: 0; border-radius: 7px; cursor: pointer; font: 700 .68rem/1 Inter, sans-serif; }
+    .language-switch button[aria-pressed="true"] { color: var(--white); background: var(--ink); }
+    .menu-toggle { display: none; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; }
+    .menu-toggle span { display: block; width: 22px; height: 2px; margin: 5px auto; background: var(--ink); transition: .2s ease; }
+
+    .hero { min-height: 689px; padding: 76px 0 68px; background:
+      radial-gradient(circle at 74% -25%, rgba(181,180,255,.6) 0 24%, transparent 47%),
+      radial-gradient(circle at 5% -28%, rgba(190,235,255,.8) 0 26%, transparent 50%),
+      radial-gradient(circle at 108% 10%, rgba(250,227,255,.7) 0 24%, transparent 52%),
+      var(--hero); }
+    .hero::before { position: absolute; inset: 0; opacity: .22; background: url("assets/soroticket/hero-grid.svg") center/auto 609px repeat-x; content: ""; }
+    .hero-grid { position: relative; display: grid; min-height: 545px; grid-template-columns: minmax(0, 1.35fr) minmax(340px, .85fr); align-items: center; gap: clamp(36px, 7vw, 96px); }
+    .hero-grid > *, .problem-grid > *, .service-grid > *, .wa-grid > *, .clarity-grid > *, .faq-layout > *, .process-head > * { min-width: 0; }
+    .hero-content { position: relative; z-index: 1; max-width: 700px; }
+    .hero .eyebrow { display: inline-flex; margin-bottom: 22px; padding: 6px 16px; color: var(--white); background: var(--ink); border-radius: 6px; }
+    .hero-lead { max-width: 660px; font-size: 1.05rem; }
+    .hero-note { margin-top: 18px; color: #62676a; font-size: .76rem; }
+    .preview-pill { display: inline-flex; align-items: center; gap: 8px; margin-left: 10px; color: #586062; font-size: .68rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; vertical-align: middle; }
+    .preview-pill::before { width: 7px; height: 7px; background: var(--purple); border-radius: 50%; content: ""; }
+
+    .chat { position: relative; z-index: 2; width: min(100%, 390px); margin-inline: auto; overflow: hidden; background: var(--white); border: 1px solid rgba(226,232,240,.82); border-radius: 17px; box-shadow: 0 14px 44px rgba(0,0,0,.1); transform: rotate(1.3deg); }
+    .chat-header { display: flex; align-items: center; gap: 11px; padding: 18px 16px; border-bottom: 1px solid var(--line); }
+    .chat-back { width: 20px; height: 20px; }
+    .chat-avatar { display: grid; width: 38px; height: 38px; flex: 0 0 38px; place-items: center; background: var(--ink); border-radius: 50%; }
+    .chat-avatar img { width: 19px; height: 19px; }
+    .chat-person { flex: 1; color: #1a2b2b; font: 700 .78rem/1.25 Inter, sans-serif; }
+    .chat-person small { display: flex; align-items: center; gap: 5px; margin-top: 3px; color: #656b75; font-weight: 400; }
+    .chat-person small::before { width: 7px; height: 7px; background: #27bd6a; border-radius: 50%; content: ""; }
+    .chat-actions { color: #596064; font: 700 1.15rem/1 Inter, sans-serif; letter-spacing: .08em; }
+    .chat-body { display: flex; min-height: 370px; flex-direction: column; gap: 12px; padding: 18px 16px; background: #f7f2eb; }
+    .bubble { max-width: 87%; padding: 10px 12px; color: #18211b; background: var(--white); border-radius: 14px; font: 400 .74rem/1.5 Inter, sans-serif; box-shadow: 0 1px 0 rgba(0,0,0,.03); }
+    .bubble.user { align-self: flex-end; background: #d0fed0; border-bottom-right-radius: 4px; }
+    .bubble.bot { margin-left: 35px; border-bottom-left-radius: 4px; }
+    .benefit { padding: 13px; border-left: 2px solid var(--ink); }
+    .benefit strong { display: block; margin-bottom: 4px; color: #11161e; font-size: .86rem; line-height: 1.25; }
+    .benefit small { color: #64696b; }
+    .benefit .chat-button { display: block; margin-top: 12px; padding: 8px 12px; color: var(--white); background: var(--ink); border-radius: 100px; text-align: center; font-family: Poppins, sans-serif; }
+    .chat-input { display: flex; gap: 10px; padding: 14px; background: var(--white); }
+    .chat-field { display: flex; height: 48px; flex: 1; align-items: center; padding: 0 14px; color: #798087; background: #f7f8f8; border: 1px solid var(--line); border-radius: 100px; font-size: .72rem; }
+    .chat-send { display: grid; width: 48px; place-items: center; color: var(--white); background: #21c36d; border-radius: 50%; font-weight: 700; }
+
+    .problem { color: var(--white); background: var(--ink); }
+    .problem::before { position: absolute; inset: 0; opacity: .12; background: url("assets/soroticket/dark-grid.svg") center/cover no-repeat; content: ""; }
+    .problem-grid { position: relative; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 70px; }
+    .problem h2 { max-width: 610px; margin: 0; color: var(--white); }
+    .problem .eyebrow { color: var(--lavender); }
+    .problem-copy { display: grid; gap: 24px; }
+    .problem-quote { color: var(--lavender); font-size: 1.2rem; font-style: italic; font-weight: 500; }
+
+    .service-grid { display: grid; grid-template-columns: minmax(280px, .78fr) minmax(520px, 1.22fr); align-items: start; gap: 76px; }
+    .service-intro { position: sticky; top: 125px; }
+    .service-intro h2 { max-width: 520px; }
+    .service-cards { position: relative; display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+    .service-cards::before { position: absolute; inset: -40px -25px; z-index: -1; opacity: .95; background: url("assets/soroticket/card-flourish.svg") center/100% 100% no-repeat; content: ""; }
+    .number-card { min-height: 268px; padding: 32px; background: var(--white); border: 1px solid var(--line); border-radius: 20px; }
+    .number { display: grid; width: 49px; height: 47px; margin-bottom: 18px; place-items: center; color: var(--purple); background: rgba(216,214,255,.34); border-radius: 10px; font: 700 1.8rem/1 Inter, sans-serif; }
+    .service-close { margin-top: 36px; color: var(--ink); font-size: 1.05rem; font-weight: 500; }
+
+    .types { background:
+      radial-gradient(circle at 10% 110%, rgba(255,230,191,.48), transparent 38%),
+      radial-gradient(circle at 92% 10%, rgba(190,235,255,.5), transparent 42%),
+      var(--surface); }
+    .types-head { margin-bottom: 42px; }
+    .types-head h2 { max-width: 620px; }
+    .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+    .type-card { min-height: 305px; padding: 40px; background: rgba(255,255,255,.9); border: 1px solid rgba(255,255,255,.85); border-radius: var(--radius); box-shadow: 0 14px 38px rgba(70,72,73,.045); }
+    .type-card p { min-height: 112px; color: #515865; font-size: .93rem; }
+    .example { display: flex; align-items: center; gap: 8px; margin-top: 20px; color: #515865; font-size: .85rem; }
+    .example code { padding: 5px 12px; color: var(--copy); background: var(--hero); font: 500 .82rem/1.4 Inter, monospace; }
+    .section-close { max-width: 840px; margin: 38px auto 0; color: #515865; font-size: .86rem; text-align: center; }
+
+    .solutions-head { margin-bottom: 48px; }
+    .solutions-head h2 { max-width: 670px; }
+    .solution-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .solution-card { display: flex; min-height: 390px; flex-direction: column; padding: 32px; border: 1px solid var(--line); border-radius: 20px; transition: transform .25s ease, box-shadow .25s ease; }
+    .solution-card:hover { transform: translateY(-5px); box-shadow: var(--shadow); }
+    .icon-box { display: grid; width: 60px; height: 60px; margin-bottom: 20px; place-items: center; background: rgba(216,214,255,.3); border-radius: 12px; }
+    .solution-card:nth-child(2) .icon-box, .solution-card:nth-child(6) .icon-box { background: rgba(190,235,255,.36); }
+    .solution-card:nth-child(3) .icon-box { background: rgba(250,227,255,.42); }
+    .solution-card:nth-child(4) .icon-box { background: rgba(255,230,191,.42); }
+    .icon-box img { width: 40px; height: 40px; }
+    .solution-card > p { font-family: Inter, sans-serif; font-size: .88rem; }
+    .ideal { margin-top: auto; padding: 14px 12px; background: var(--surface); border-radius: 10px; font-size: .79rem; line-height: 1.6; }
+    .ideal strong { color: var(--title); }
+
+    .whatsapp { background:
+      radial-gradient(circle at 5% 110%, rgba(255,230,191,.45), transparent 37%),
+      radial-gradient(circle at 95% 20%, rgba(190,235,255,.5), transparent 37%),
+      var(--surface); }
+    .wa-head { margin-bottom: 48px; }
+    .wa-head h2 { max-width: 980px; }
+    .wa-head .section-copy { max-width: 570px; }
+    .wa-grid { display: grid; grid-template-columns: 1fr .94fr; align-items: start; gap: clamp(55px, 11vw, 180px); }
+    .wa-card { padding: 40px; background: var(--white); border-radius: var(--radius); }
+    .wa-card h3 { font-size: 1.5rem; }
+    .check-list { display: grid; gap: 12px; margin: 22px 0 0; padding: 0; list-style: none; }
+    .check-list li { display: flex; align-items: flex-start; gap: 12px; font-size: .86rem; }
+    .check-list img { width: 14px; height: 14px; margin-top: 5px; flex: 0 0 14px; }
+    .journey .eyebrow { margin-bottom: 24px; }
+    .journey-list { margin: 0; padding: 0; list-style: none; }
+    .journey-list li { display: flex; align-items: center; gap: 12px; padding: 16px 0; color: var(--title); border-bottom: 1px solid #aeb4b8; }
+    .journey-list span { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; border: 1px solid var(--title); border-radius: 50%; font-size: .82rem; }
+    .journey-quote { margin-top: 28px; color: var(--title); font-size: 1.22rem; font-style: italic; font-weight: 600; }
+
+    .process { background: var(--white); }
+    .process-head { display: grid; margin-bottom: 50px; grid-template-columns: 1fr .82fr; align-items: end; gap: 60px; }
+    .process-head h2 { max-width: 680px; margin-bottom: 0; }
+    .process-grid { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .process-card { position: relative; min-height: 280px; padding: 34px 28px; border-right: 1px solid var(--line); }
+    .process-card:last-child { border-right: 0; }
+    .process-card .step { display: block; margin-bottom: 54px; color: var(--purple); font: 700 .78rem/1 Inter, sans-serif; letter-spacing: .08em; }
+    .process-close { max-width: 760px; margin-top: 34px; color: var(--title); font-size: 1.05rem; font-weight: 600; }
+
+    .clarity { color: var(--white); background: var(--ink); }
+    .clarity h2, .clarity h3 { color: var(--white); }
+    .clarity-grid { display: grid; grid-template-columns: .82fr 1.18fr; align-items: center; gap: 78px; }
+    .clarity .eyebrow { color: var(--lavender); }
+    .panel { padding: 26px; color: var(--copy); background: var(--surface); border-radius: var(--radius); box-shadow: 0 28px 70px rgba(0,0,0,.25); }
+    .panel-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
+    .panel-top strong { color: var(--title); font-family: Inter, sans-serif; }
+    .panel-status { padding: 5px 10px; color: #347957; background: #dff7e9; border-radius: 100px; font-size: .68rem; font-weight: 700; text-transform: uppercase; }
+    .metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .metric { padding: 16px; background: var(--white); border: 1px solid var(--line); border-radius: 12px; }
+    .metric small { display: block; color: var(--muted); font-size: .68rem; }
+    .metric strong { color: var(--title); font: 700 1.5rem/1.3 Inter, sans-serif; }
+    .chart { display: flex; height: 150px; align-items: end; gap: 10px; margin-top: 18px; padding: 20px 18px 0; background: var(--white); border: 1px solid var(--line); border-radius: 12px; }
+    .chart i { flex: 1; min-height: 18%; background: var(--lavender); border-radius: 5px 5px 0 0; }
+    .chart i:nth-child(2) { height: 43%; }.chart i:nth-child(3) { height: 72%; }.chart i:nth-child(4) { height: 55%; }.chart i:nth-child(5) { height: 91%; }.chart i:nth-child(6) { height: 78%; }.chart i:nth-child(7) { height: 100%; }
+
+    .trust-grid, .industry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 42px; }
+    .trust-card { padding: 28px; background: var(--surface); border-radius: 16px; }
+    .trust-card strong { display: block; color: var(--title); font: 600 1rem/1.4 Inter, sans-serif; }
+    .trust-card::before { display: block; width: 28px; height: 4px; margin-bottom: 24px; background: var(--purple); border-radius: 100px; content: ""; }
+    .industries { background: var(--surface); }
+    .industry-grid { grid-template-columns: repeat(5, 1fr); }
+    .industry { min-height: 230px; padding: 26px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; }
+    .industry b { display: block; margin-bottom: 18px; color: var(--purple); font: 700 .75rem/1 Inter, sans-serif; }
+
+    .faq-layout { display: grid; grid-template-columns: .72fr 1.28fr; align-items: start; gap: 90px; }
+    .faq-list { border-top: 1px solid var(--line); }
+    details { border-bottom: 1px solid var(--line); }
+    summary { position: relative; padding: 22px 44px 22px 0; color: var(--title); cursor: pointer; font: 600 1rem/1.45 Inter, sans-serif; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { position: absolute; top: 20px; right: 4px; color: var(--purple); content: "+"; font: 400 1.6rem/1 Inter, sans-serif; transition: transform .2s ease; }
+    details[open] summary::after { transform: rotate(45deg); }
+    details p { max-width: 720px; padding: 0 44px 22px 0; font-size: .9rem; }
+
+    .cta { padding: 110px 0; text-align: center; background:
+      radial-gradient(circle at 18% 20%, rgba(190,235,255,.8), transparent 33%),
+      radial-gradient(circle at 83% 0, rgba(181,180,255,.7), transparent 35%),
+      radial-gradient(circle at 55% 120%, rgba(250,227,255,.8), transparent 34%),
+      var(--hero); }
+    .cta .shell { max-width: 900px; }
+    .cta h2 { font-size: clamp(2.6rem, 4.7vw, 4.7rem); }
+    .cta .button-row { justify-content: center; }
+    .cta small { display: block; margin-top: 22px; color: #62676a; }
+
+    .site-footer { padding: 72px 0 32px; color: #989898; background: var(--ink); font-size: .83rem; }
+    .footer-grid { display: grid; grid-template-columns: 1.45fr repeat(3, .7fr); gap: 70px; }
+    .footer-brand { max-width: 360px; }
+    .footer-brand .brand { margin-bottom: 18px; color: var(--white); }
+    .footer-col { display: grid; align-content: start; gap: 12px; }
+    .footer-col strong { margin-bottom: 4px; color: var(--white); }
+    .footer-col a:hover { color: var(--white); }
+    .footer-bottom { display: flex; margin-top: 54px; padding-top: 24px; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.1); }
+    .status { color: var(--lavender); }
+
+    .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.visible { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .reveal { opacity: 1; transform: none; transition: none; } .button, .solution-card { transition: none; } }
+
+    @media (max-width: 1100px) {
+      .nav { gap: 17px; }
+      .nav a:not(.button) { display: none; }
+      .hero-grid { grid-template-columns: 1.15fr .85fr; gap: 30px; }
+      .service-grid { grid-template-columns: 1fr; }
+      .service-intro { position: static; }
+      .solution-grid { grid-template-columns: repeat(2, 1fr); }
+      .process-grid { grid-template-columns: repeat(2, 1fr); }
+      .process-card:nth-child(2) { border-right: 0; }
+      .process-card:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .industry-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 780px) {
+      .shell { width: min(100% - 32px, 680px); }
+      .section { padding: 72px 0; }
+      .site-header { height: 74px; }
+      .menu-toggle { display: block; position: relative; z-index: 2; }
+      .nav { position: fixed; inset: 0; display: flex; padding: 110px 24px 40px; flex-direction: column; align-items: stretch; gap: 6px; background: var(--white); opacity: 0; pointer-events: none; transform: translateY(-10px); transition: .2s ease; }
+      .nav.open { opacity: 1; pointer-events: auto; transform: none; }
+      .nav a:not(.button) { display: block; padding: 13px 6px; font-size: 1rem; }
+      .nav .button { margin-top: 14px; }
+      .language-switch { width: max-content; margin: 14px 0 8px; }
+      .menu-toggle[aria-expanded="true"] span:first-child { transform: translateY(7px) rotate(45deg); }
+      .menu-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+      .menu-toggle[aria-expanded="true"] span:last-child { transform: translateY(-7px) rotate(-45deg); }
+      .hero { padding: 58px 0 70px; }
+      .hero-grid, .problem-grid, .wa-grid, .clarity-grid, .faq-layout, .process-head { grid-template-columns: minmax(0, 1fr); }
+      .hero-content { text-align: left; }
+      .preview-pill { display: flex; width: max-content; margin: 10px 0 0; }
+      .chat { margin-top: 22px; transform: none; }
+      .problem-grid { gap: 38px; }
+      .service-cards, .type-grid, .solution-grid, .trust-grid { grid-template-columns: 1fr; }
+      .service-cards::before { display: none; }
+      .type-card { min-height: auto; }
+      .type-card p { min-height: auto; }
+      .solution-card { min-height: auto; }
+      .ideal { margin-top: 28px; }
+      .wa-grid { gap: 44px; }
+      .process-head { gap: 24px; }
+      .metric-grid { grid-template-columns: 1fr; }
+      .industry-grid { grid-template-columns: repeat(2, 1fr); }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .footer-brand { grid-column: 1 / -1; }
+      .footer-bottom { align-items: flex-start; flex-direction: column; gap: 10px; }
+    }
+
+    @media (max-width: 520px) {
+      h1 { font-size: 2.55rem; }
+      h2 { font-size: 2.08rem; }
+      .button-row { align-items: stretch; flex-direction: column; }
+      .button { width: 100%; }
+      .number-card, .type-card, .solution-card, .wa-card { padding: 28px; }
+      .service-cards, .type-grid { gap: 16px; }
+      .process-grid, .industry-grid, .footer-grid { grid-template-columns: 1fr; }
+      .process-card { min-height: 230px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .process-card:nth-child(3) { border-bottom: 1px solid var(--line); }
+      .process-card:last-child { border-bottom: 0; }
+      .process-card .step { margin-bottom: 30px; }
+      .footer-brand { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="#inicio" aria-label="Soroticket, inicio"><span class="brand-mark">St</span>Soroticket</a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Abrir navegación">
+        <span></span><span></span><span></span>
+      </button>
+      <nav class="nav" id="site-nav" aria-label="Navegación principal">
+        <a href="#soluciones">Qué puedes crear</a>
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#whatsapp">WhatsApp</a>
+        <a href="#empresa">Para tu empresa</a>
+        <a href="#preguntas">Preguntas frecuentes</a>
+        <div class="language-switch" role="group" aria-label="Language">
+          <button type="button" data-language="en" aria-pressed="true">EN</button>
+          <button type="button" data-language="es" aria-pressed="false">ES</button>
+        </div>
+        <a class="button button-dark" href="#contacto">Quiero crear una campaña</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="contenido">
+    <section class="hero" id="inicio">
+      <div class="shell hero-grid">
+        <div class="hero-content reveal">
+          <p class="eyebrow">Promociones y lealtad, sin complicarte</p>
+          <span class="preview-pill">Preview acompañada · testnet</span>
+          <h1>Crea beneficios que tus clientes pueden usar desde WhatsApp</h1>
+          <p class="hero-lead">Soroticket pone en marcha cupones, vouchers, tickets y programas de lealtad para tu empresa. Nos encargamos de la configuración, los códigos y la experiencia en WhatsApp, para que tú puedas enfocarte en tu negocio.</p>
+          <div class="button-row">
+            <a class="button button-dark button-arrow" href="#contacto">Quiero lanzar una campaña</a>
+            <a class="button button-ghost" href="#soluciones">Ver qué puedo crear</a>
+          </div>
+          <p class="hero-note">Desde la idea hasta el primer uso, te acompañamos en todo el proceso.</p>
+        </div>
+
+        <div class="chat reveal" aria-label="Ejemplo de una conversación de Soroticket en WhatsApp">
+          <div class="chat-header">
+            <img class="chat-back" src="assets/soroticket/arrow-back.svg" alt="">
+            <div class="chat-avatar"><img src="assets/soroticket/bot.svg" alt=""></div>
+            <div class="chat-person">Soroticket bot<small>en línea</small></div>
+            <div class="chat-actions" aria-hidden="true">•••</div>
+          </div>
+          <div class="chat-body">
+            <div class="bubble user">Hola, quiero ver mis beneficios.</div>
+            <div class="bubble bot">¡Hola, Ana! Tienes un voucher disponible:</div>
+            <div class="bubble bot benefit">
+              <strong>20% de descuento en tu próxima compra</strong>
+              <small>Válido hasta el 30 de septiembre.</small>
+              <span class="chat-button">Usar mi beneficio</span>
+            </div>
+            <div class="bubble bot">Listo. Aquí tienes tu código. Muéstralo al momento de pagar.</div>
+            <div class="bubble bot"><strong>A7K9-QX2M</strong></div>
+          </div>
+          <div class="chat-input"><div class="chat-field">Mensaje</div><div class="chat-send" aria-hidden="true">●</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section problem">
+      <div class="shell problem-grid">
+        <div class="reveal">
+          <p class="eyebrow">Más fácil para tu equipo. Más fácil para tus clientes.</p>
+          <h2>Una buena promoción no debería convertirse en otro problema</h2>
+        </div>
+        <div class="problem-copy reveal">
+          <p>Crear el beneficio es solo el comienzo. También hay que definir cómo se entrega, cómo se usa, cómo se evita la confusión y cómo se miden los resultados.</p>
+          <p>Con Soroticket no tienes que comenzar un desarrollo desde cero ni coordinar varias herramientas por tu cuenta. Te ayudamos a elegir el formato, preparamos la campaña y dejamos una experiencia clara para tu equipo y tus clientes.</p>
+          <p class="problem-quote">Menos tiempo resolviendo cómo hacerlo. Más tiempo viendo resultados.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="como-funciona">
+      <div class="shell service-grid">
+        <div class="service-intro reveal">
+          <p class="eyebrow">No te entregamos una herramienta y desaparecemos</p>
+          <h2>Tú traes el objetivo. Nosotros lo ponemos a funcionar.</h2>
+          <p>Tal vez quieres aumentar las visitas, premiar a quienes vuelven, lanzar una promoción con creadores o controlar el acceso a un evento. Comenzamos por ese objetivo y construimos la dinámica adecuada alrededor de él.</p>
+          <div class="button-row"><a class="button button-dark" href="#contacto">Conversemos</a></div>
+          <p class="service-close">No necesitas llegar con todas las respuestas. Para eso hacemos la primera conversación contigo.</p>
+        </div>
+        <div class="service-cards">
+          <article class="number-card reveal"><span class="number">1</span><h3>Diseñamos la dinámica contigo</h3><p>Te ayudamos a decidir qué beneficio ofrecer, quién puede recibirlo, cuánto dura y qué debe pasar para usarlo.</p></article>
+          <article class="number-card reveal"><span class="number">2</span><h3>Preparamos toda la campaña</h3><p>Configuramos las reglas, generamos los códigos o QR y dejamos listo el recorrido que seguirá cada cliente.</p></article>
+          <article class="number-card reveal"><span class="number">3</span><h3>Activamos la experiencia</h3><p>Ponemos en marcha el recorrido y, cuando hace falta, conectamos la campaña con las herramientas que tu empresa ya utiliza.</p></article>
+          <article class="number-card reveal"><span class="number">4</span><h3>Te acompañamos después del lanzamiento</h3><p>Pruebas, seguimiento y ajustes. Tu equipo puede ver la actividad y entender qué está pasando desde un mismo lugar.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section types">
+      <div class="shell">
+        <div class="types-head reveal">
+          <p class="eyebrow badge">Antes de elegir, entendamos lo esencial</p>
+          <h2>No todos los códigos sirven para lo mismo</h2>
+          <p class="section-copy">En Soroticket una campaña puede funcionar de tres maneras muy fáciles de entender:</p>
+        </div>
+        <div class="type-grid">
+          <article class="type-card reveal"><h3>Un código para muchas personas</h3><p>El mismo código puede usarse varias veces. Es ideal para promociones generales o campañas con creadores.</p><div class="example"><span>Ej.</span><code>VERANO20</code></div></article>
+          <article class="type-card reveal"><h3>Un código único para cada persona</h3><p>Cada voucher o ticket tiene su propio código y funciona una sola vez. Es ideal cuando el beneficio no debe repetirse.</p><div class="example"><span>Ej.</span><code>A7K9-QX2M</code></div></article>
+          <article class="type-card reveal"><h3>Un progreso que se va acumulando</h3><p>Cada visita o compra suma un avance. Cuando el cliente llega a la meta, recibe su recompensa.</p><div class="example"><span>Ej.</span><code>COMPRA 10 Y RECIBE 1</code></div></article>
+        </div>
+        <p class="section-close reveal">No tienes que aprender estos formatos para comenzar. Cuéntanos qué quieres lograr y te ayudamos a elegir.</p>
+      </div>
+    </section>
+
+    <section class="section" id="soluciones">
+      <div class="shell">
+        <div class="solutions-head reveal">
+          <p class="eyebrow">Todo lo que puedes crear</p>
+          <h2>Una plataforma, muchas formas de acercarte a tus clientes</h2>
+          <p class="section-copy">Puedes comenzar con una campaña sencilla y hacerla crecer a medida que aprendes qué funciona mejor para tu negocio.</p>
+        </div>
+        <div class="solution-grid">
+          <article class="solution-card reveal"><div class="icon-box"><img src="assets/soroticket/coupon.svg" alt=""></div><h3>Cupones promocionales</h3><p>Un código fácil de recordar que muchas personas pueden usar durante una promoción.</p><p class="ideal"><strong>Ideal para:</strong> lanzamientos, temporadas, descuentos y campañas en redes.<br><strong>Ejemplo:</strong> 20% de descuento usando <strong>VERANO20</strong>.</p></article>
+          <article class="solution-card reveal"><div class="icon-box"><img src="assets/soroticket/voucher.svg" alt=""></div><h3>Vouchers de un solo uso</h3><p>Un beneficio individual que se usa una vez y queda registrado como canjeado.</p><p class="ideal"><strong>Ideal para:</strong> regalos, compensaciones, invitaciones y premios.<br><strong>Ejemplo:</strong> un almuerzo gratis para un cliente especial.</p></article>
+          <article class="solution-card reveal"><div class="icon-box"><img src="assets/soroticket/ticket.svg" alt=""></div><h3>Tickets para eventos</h3><p>Un código único por entrada que se valida al llegar.</p><p class="ideal"><strong>Ideal para:</strong> eventos, experiencias, reservas y controles de acceso.<br><strong>Ejemplo:</strong> 200 entradas, cada una con su propio QR.</p></article>
+          <article class="solution-card reveal"><div class="icon-box"><img src="assets/soroticket/referral.svg" alt=""></div><h3>Códigos de creadores y referidos</h3><p>Un código para cada creador o aliado, con sus usos registrados por separado.</p><p class="ideal"><strong>Ideal para:</strong> influencers, embajadores, vendedores, afiliados y alianzas.<br><strong>Ejemplo:</strong> <strong>MARIA10</strong> para medir los clientes que llegaron por María.</p></article>
+          <article class="solution-card reveal"><div class="icon-box"><img src="assets/soroticket/loyalty.svg" alt=""></div><h3>Programas de lealtad</h3><p>Cada compra o visita acerca al cliente a una recompensa.</p><p class="ideal"><strong>Ideal para:</strong> cafeterías, restaurantes, comercios y servicios frecuentes.<br><strong>Ejemplo:</strong> compra 10 cafés y recibe el próximo gratis.</p></article>
+          <article class="solution-card reveal"><div class="icon-box"><img src="assets/soroticket/activation.svg" alt=""></div><h3>Muestras, regalos y activaciones</h3><p>Un QR registra una entrega, una cortesía o una interacción promocional.</p><p class="ideal"><strong>Ideal para:</strong> marcas, distribuidores, degustaciones y activaciones.<br><strong>Ejemplo:</strong> un QR por local para revisar la actividad registrada.</p></article>
+        </div>
+        <div class="button-row"><a class="button button-dark" href="#contacto">Ayúdame a elegir</a></div>
+      </div>
+    </section>
+
+    <section class="section whatsapp" id="whatsapp">
+      <div class="shell">
+        <div class="wa-head reveal">
+          <p class="eyebrow">WhatsApp incluido</p>
+          <h2>Tus clientes ya saben usarlo. Por eso empezamos ahí.</h2>
+          <p class="section-copy">Nadie quiere descargar otra aplicación para usar un cupón o consultar una recompensa. Con Soroticket, tus clientes pueden hacerlo desde una conversación que ya conocen.</p>
+        </div>
+        <div class="wa-grid">
+          <article class="wa-card reveal">
+            <h3>Lleva tu campaña al lugar donde tus clientes ya conversan</h3>
+            <p>Soroticket está preparado para conectar cupones, vouchers y programas de lealtad con una experiencia en WhatsApp. Diseñamos contigo el recorrido y definimos la integración necesaria para tu campaña.</p>
+            <ul class="check-list">
+              <li><img src="assets/soroticket/check.svg" alt="">Abrir la conversación desde un enlace o un QR.</li>
+              <li><img src="assets/soroticket/check.svg" alt="">Recibir o ingresar su código.</li>
+              <li><img src="assets/soroticket/check.svg" alt="">Consultar el beneficio o el avance de su recompensa.</li>
+              <li><img src="assets/soroticket/check.svg" alt="">Presentar o usar un voucher.</li>
+              <li><img src="assets/soroticket/check.svg" alt="">Recibir una confirmación clara al terminar.</li>
+            </ul>
+          </article>
+          <div class="journey reveal">
+            <p class="eyebrow">Cómo se siente para el cliente</p>
+            <ol class="journey-list"><li><span>1</span>Escanea un QR o toca un enlace.</li><li><span>2</span>WhatsApp abre la conversación.</li><li><span>3</span>El bot le indica qué hacer.</li><li><span>4</span>Su beneficio queda listo para usar.</li></ol>
+            <p class="journey-quote">Sin descargas. Sin cuentas nuevas. Sin instrucciones largas.</p>
+            <div class="button-row"><a class="button button-dark" href="#contacto">Conversemos sobre la integración</a></div>
+          </div>
+        </div>
+        <p class="section-close reveal">La experiencia puede adaptarse al tipo de campaña y al lenguaje de tu marca.</p>
+      </div>
+    </section>
+
+    <section class="section process" id="empresa">
+      <div class="shell">
+        <div class="process-head reveal"><div><p class="eyebrow">De la idea al primer canje</p><h2>Ponemos tu campaña en marcha en cuatro pasos</h2></div><p>Tú conoces a tus clientes. Nosotros te ayudamos a convertir ese conocimiento en una experiencia que funciona.</p></div>
+        <div class="process-grid">
+          <article class="process-card reveal"><span class="step">PASO 01</span><h3>Cuéntanos qué quieres lograr</h3><p>Más visitas, más compras, clientes que regresen, una activación o una campaña con creadores.</p></article>
+          <article class="process-card reveal"><span class="step">PASO 02</span><h3>Definimos la mejor dinámica</h3><p>Elegimos juntos el tipo de cupón, voucher, ticket o programa y acordamos sus reglas.</p></article>
+          <article class="process-card reveal"><span class="step">PASO 03</span><h3>Lo configuramos y lo probamos</h3><p>Preparamos los códigos, el recorrido y los puntos donde tu equipo entrega o valida el beneficio.</p></article>
+          <article class="process-card reveal"><span class="step">PASO 04</span><h3>Lanzamos y hacemos seguimiento</h3><p>La campaña sale al público y puedes ver sus usos, avances y recompensas desde el panel.</p></article>
+        </div>
+        <p class="process-close reveal">De la idea al primer uso, con un alcance y un tiempo de puesta en marcha claros.</p>
+      </div>
+    </section>
+
+    <section class="section clarity">
+      <div class="shell clarity-grid">
+        <div class="reveal"><p class="eyebrow">Todo claro, en un mismo lugar</p><h2>Lo que pasa en tu campaña, sin adivinar</h2><p>Soroticket reúne la actividad de tus campañas para que puedas responder preguntas sencillas sin depender de hojas sueltas o reportes difíciles de entender.</p><p class="problem-quote" style="margin-top:28px">Datos claros para decidir qué repetir, qué ajustar y qué hacer después.</p></div>
+        <div class="panel reveal" aria-label="Vista ilustrativa del panel de campaña">
+          <div class="panel-top"><strong>Campaña · Visitas de verano</strong><span class="panel-status">Preview</span></div>
+          <div class="metric-grid"><div class="metric"><small>Usos registrados</small><strong>1.248</strong></div><div class="metric"><small>Recompensas</small><strong>186</strong></div><div class="metric"><small>Campañas activas</small><strong>04</strong></div></div>
+          <div class="chart" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="shell">
+        <div class="reveal"><p class="eyebrow">La tecnología trabaja por detrás</p><h2>Para tus clientes es simple. Para tu empresa queda claro.</h2><p class="section-copy">Cada uso registrado deja un historial que ayuda a mantener cuentas claras y a revisar lo ocurrido. Si más adelante necesitas conectar Soroticket con una tienda, un punto de venta u otra herramienta, definimos contigo la integración adecuada.</p></div>
+        <div class="trust-grid"><article class="trust-card reveal"><strong>Cada código tiene reglas claras.</strong></article><article class="trust-card reveal"><strong>Cada uso queda registrado.</strong></article><article class="trust-card reveal"><strong>Cada campaña puede revisarse desde un mismo lugar.</strong></article></div>
+        <p class="process-close reveal">No tienes que entender la tecnología para aprovecharla.</p>
+      </div>
+    </section>
+
+    <section class="section industries">
+      <div class="shell">
+        <div class="reveal"><p class="eyebrow">Para tu empresa</p><h2>Hecho para negocios que quieren crear una mejor razón para volver</h2></div>
+        <div class="industry-grid">
+          <article class="industry reveal"><b>01</b><h3>Restaurantes y cafeterías</h3><p>Premia visitas frecuentes, entrega vouchers y crea promociones fáciles de usar.</p></article>
+          <article class="industry reveal"><b>02</b><h3>Tiendas y marcas</h3><p>Lanza descuentos, regalos, campañas con creadores y activaciones de producto.</p></article>
+          <article class="industry reveal"><b>03</b><h3>Organizadores de eventos</h3><p>Emite entradas únicas y valida cada acceso de forma sencilla.</p></article>
+          <article class="industry reveal"><b>04</b><h3>Equipos de marketing</h3><p>Prueba campañas, sigue resultados y trabaja con aliados o referidos.</p></article>
+          <article class="industry reveal"><b>05</b><h3>Distribuidores</h3><p>Registra activaciones y entregas por punto, local o aliado.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="preguntas">
+      <div class="shell faq-layout">
+        <div class="reveal"><p class="eyebrow">Preguntas frecuentes</p><h2>Lo importante, antes de comenzar</h2><p>Si tu caso necesita algo diferente, lo revisamos contigo en la primera conversación.</p></div>
+        <div class="faq-list reveal">
+          <details><summary>¿Necesito un equipo técnico para usar Soroticket?</summary><p>No. Te acompañamos para definir y preparar la campaña. Si necesitas conectarla con otras herramientas de tu empresa, revisamos contigo la mejor forma de hacerlo.</p></details>
+          <details><summary>¿Mis clientes tienen que descargar una aplicación?</summary><p>No. Pueden entrar desde un enlace o un QR y usar la experiencia a través de WhatsApp.</p></details>
+          <details><summary>¿Cuál es la diferencia entre un cupón y un voucher?</summary><p>Un cupón suele compartir el mismo código entre muchas personas. Un voucher tiene un código único y normalmente se usa una sola vez.</p></details>
+          <details><summary>¿Qué tipo de campaña me conviene?</summary><p>Depende de tu objetivo. Para alcance puede funcionar un cupón compartido; para controlar cada beneficio, un voucher único; y para impulsar visitas repetidas, un programa de lealtad.</p></details>
+          <details><summary>¿Puedo crear una campaña con creadores o referidos?</summary><p>Sí. Puedes asignar un código a cada creador o aliado y consultar los usos registrados que corresponden a ese código.</p></details>
+          <details><summary>¿Puedo comenzar con algo pequeño?</summary><p>Sí. Puedes comenzar con una campaña concreta, aprender de sus resultados y ampliarla después.</p></details>
+          <details><summary>¿Puedo conectar Soroticket con mi tienda o sistema actual?</summary><p>Soroticket cuenta con herramientas de integración. Primero revisamos cómo trabaja hoy tu empresa y luego definimos la conexión que realmente necesitas.</p></details>
+          <details><summary>¿Cuánto tarda en estar lista una campaña?</summary><p>Depende de la dinámica y de las conexiones necesarias. Después de conocer tu objetivo, te proponemos un alcance y un tiempo de puesta en marcha claros.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta" id="contacto">
+      <div class="shell reveal">
+        <p class="eyebrow">Tu próxima campaña puede comenzar con una conversación</p>
+        <h2>Cuéntanos qué quieres lograr. Nosotros te ayudamos a ponerlo en marcha.</h2>
+        <p>No necesitas tener las reglas, los mensajes ni la parte técnica resueltos. Trae la idea y construimos contigo una experiencia sencilla para tu empresa y tus clientes.</p>
+        <div class="button-row"><a class="button button-dark button-arrow" href="#inicio">Quiero crear mi campaña</a><a class="button button-light" href="#preguntas">Resolver una duda primero</a></div>
+        <small>Cupones, vouchers, tickets, referidos y lealtad desde un mismo lugar · Preview privada sobre testnet.</small>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div class="footer-grid">
+        <div class="footer-brand"><a class="brand" href="#inicio"><span class="brand-mark">St</span>Soroticket</a><p>Soroticket hace que crear, entregar y seguir un beneficio sea más sencillo.</p></div>
+        <div class="footer-col"><strong>Soluciones</strong><a href="#soluciones">Qué puedes crear</a><a href="#como-funciona">Cómo funciona</a><a href="#whatsapp">WhatsApp</a></div>
+        <div class="footer-col"><strong>Empresa</strong><a href="#empresa">Para tu empresa</a><a href="#preguntas">Preguntas frecuentes</a><a href="#contacto">Contacto</a></div>
+        <div class="footer-col"><strong>Legal</strong><a href="#">Privacidad</a><a href="#">Términos</a><span class="status">Preview / testnet</span></div>
+      </div>
+      <div class="footer-bottom"><span>© 2026 Soroticket. Todos los derechos reservados.</span><span>Diseñado para campañas más fáciles de lanzar y usar.</span></div>
+    </div>
+  </footer>
+
+  <script>
+    const translations = [
+      ["Saltar al contenido", "Skip to content"],
+      ["Qué puedes crear", "What you can create"],
+      ["Cómo funciona", "How it works"],
+      ["Para tu empresa", "For your business"],
+      ["Preguntas frecuentes", "FAQs"],
+      ["Quiero crear una campaña", "I want to create a campaign"],
+      ["Promociones y lealtad, sin complicarte", "Promotions and loyalty, made simple"],
+      ["Preview acompañada · testnet", "Guided preview · testnet"],
+      ["Crea beneficios que tus clientes pueden usar desde WhatsApp", "Create rewards your customers can use through WhatsApp"],
+      ["Soroticket pone en marcha cupones, vouchers, tickets y programas de lealtad para tu empresa. Nos encargamos de la configuración, los códigos y la experiencia en WhatsApp, para que tú puedas enfocarte en tu negocio.", "Soroticket launches coupons, vouchers, tickets and loyalty programs for your business. We handle the setup, codes and WhatsApp experience so you can stay focused on your business."],
+      ["Quiero lanzar una campaña", "I want to launch a campaign"],
+      ["Ver qué puedo crear", "See what I can create"],
+      ["Desde la idea hasta el primer uso, te acompañamos en todo el proceso.", "From the initial idea to the first use, we guide you through the entire process."],
+      ["en línea", "online"],
+      ["Hola, quiero ver mis beneficios.", "Hi, I want to see my rewards."],
+      ["¡Hola, Ana! Tienes un voucher disponible:", "Hi, Ana! You have a voucher available:"],
+      ["20% de descuento en tu próxima compra", "20% off your next purchase"],
+      ["Válido hasta el 30 de septiembre.", "Valid through September 30."],
+      ["Usar mi beneficio", "Use my reward"],
+      ["Listo. Aquí tienes tu código. Muéstralo al momento de pagar.", "Done. Here is your code. Show it when you pay."],
+      ["Mensaje", "Message"],
+      ["Más fácil para tu equipo. Más fácil para tus clientes.", "Easier for your team. Easier for your customers."],
+      ["Una buena promoción no debería convertirse en otro problema", "A great promotion should not become another problem"],
+      ["Crear el beneficio es solo el comienzo. También hay que definir cómo se entrega, cómo se usa, cómo se evita la confusión y cómo se miden los resultados.", "Creating the reward is only the beginning. You also need to define how it is delivered, how it is used, how confusion is avoided and how results are measured."],
+      ["Con Soroticket no tienes que comenzar un desarrollo desde cero ni coordinar varias herramientas por tu cuenta. Te ayudamos a elegir el formato, preparamos la campaña y dejamos una experiencia clara para tu equipo y tus clientes.", "With Soroticket, you do not have to build from scratch or coordinate multiple tools on your own. We help you choose the right format, prepare the campaign and create a clear experience for your team and customers."],
+      ["Menos tiempo resolviendo cómo hacerlo. Más tiempo viendo resultados.", "Less time figuring out how to make it work. More time seeing results."],
+      ["No te entregamos una herramienta y desaparecemos", "We do not hand you a tool and disappear"],
+      ["Tú traes el objetivo. Nosotros lo ponemos a funcionar.", "You bring the goal. We make it work."],
+      ["Tal vez quieres aumentar las visitas, premiar a quienes vuelven, lanzar una promoción con creadores o controlar el acceso a un evento. Comenzamos por ese objetivo y construimos la dinámica adecuada alrededor de él.", "Maybe you want to increase visits, reward returning customers, launch a creator campaign or manage event access. We start with that goal and build the right campaign around it."],
+      ["Conversemos", "Let's talk"],
+      ["No necesitas llegar con todas las respuestas. Para eso hacemos la primera conversación contigo.", "You do not need to arrive with all the answers. That is what our first conversation is for."],
+      ["Diseñamos la dinámica contigo", "We design the campaign with you"],
+      ["Te ayudamos a decidir qué beneficio ofrecer, quién puede recibirlo, cuánto dura y qué debe pasar para usarlo.", "We help you decide what reward to offer, who can receive it, how long it lasts and what must happen to use it."],
+      ["Preparamos toda la campaña", "We prepare the entire campaign"],
+      ["Configuramos las reglas, generamos los códigos o QR y dejamos listo el recorrido que seguirá cada cliente.", "We configure the rules, generate the codes or QR and prepare the journey each customer will follow."],
+      ["Activamos la experiencia", "We activate the experience"],
+      ["Ponemos en marcha el recorrido y, cuando hace falta, conectamos la campaña con las herramientas que tu empresa ya utiliza.", "We launch the journey and, when needed, connect the campaign to the tools your business already uses."],
+      ["Te acompañamos después del lanzamiento", "We support you after launch"],
+      ["Pruebas, seguimiento y ajustes. Tu equipo puede ver la actividad y entender qué está pasando desde un mismo lugar.", "Testing, tracking and adjustments. Your team can see the activity and understand what is happening from one place."],
+      ["Antes de elegir, entendamos lo esencial", "Before choosing, let's cover the essentials"],
+      ["No todos los códigos sirven para lo mismo", "Not every code serves the same purpose"],
+      ["En Soroticket una campaña puede funcionar de tres maneras muy fáciles de entender:", "A Soroticket campaign can work in three simple ways:"],
+      ["Un código para muchas personas", "One code for many people"],
+      ["El mismo código puede usarse varias veces. Es ideal para promociones generales o campañas con creadores.", "The same code can be used multiple times. It is ideal for broad promotions or creator campaigns."],
+      ["Ej.", "E.g."],
+      ["Un código único para cada persona", "A unique code for each person"],
+      ["Cada voucher o ticket tiene su propio código y funciona una sola vez. Es ideal cuando el beneficio no debe repetirse.", "Each voucher or ticket has its own code and works only once. It is ideal when the reward must not be used twice."],
+      ["Un progreso que se va acumulando", "Progress that adds up over time"],
+      ["Cada visita o compra suma un avance. Cuando el cliente llega a la meta, recibe su recompensa.", "Each visit or purchase adds progress. When the customer reaches the goal, they receive their reward."],
+      ["COMPRA 10 Y RECIBE 1", "BUY 10 AND GET 1"],
+      ["No tienes que aprender estos formatos para comenzar. Cuéntanos qué quieres lograr y te ayudamos a elegir.", "You do not need to learn these formats before you begin. Tell us what you want to achieve and we will help you choose."],
+      ["Todo lo que puedes crear", "Everything you can create"],
+      ["Una plataforma, muchas formas de acercarte a tus clientes", "One platform, many ways to connect with your customers"],
+      ["Puedes comenzar con una campaña sencilla y hacerla crecer a medida que aprendes qué funciona mejor para tu negocio.", "Start with a simple campaign and grow it as you learn what works best for your business."],
+      ["Cupones promocionales", "Promotional coupons"],
+      ["Un código fácil de recordar que muchas personas pueden usar durante una promoción.", "An easy-to-remember code that many people can use during a promotion."],
+      ["Ideal para:", "Ideal for:"],
+      ["lanzamientos, temporadas, descuentos y campañas en redes.", "launches, seasonal offers, discounts and social campaigns."],
+      ["Ejemplo:", "Example:"],
+      ["20% de descuento usando", "20% off with"],
+      ["Vouchers de un solo uso", "Single-use vouchers"],
+      ["Un beneficio individual que se usa una vez y queda registrado como canjeado.", "An individual reward that can be used once and is then recorded as redeemed."],
+      ["regalos, compensaciones, invitaciones y premios.", "gifts, compensation, invitations and prizes."],
+      ["un almuerzo gratis para un cliente especial.", "a free lunch for a special customer."],
+      ["Tickets para eventos", "Event tickets"],
+      ["Un código único por entrada que se valida al llegar.", "A unique code for each ticket, validated on arrival."],
+      ["eventos, experiencias, reservas y controles de acceso.", "events, experiences, reservations and access control."],
+      ["200 entradas, cada una con su propio QR.", "200 tickets, each with its own QR code."],
+      ["Códigos de creadores y referidos", "Creator and referral codes"],
+      ["Un código para cada creador o aliado, con sus usos registrados por separado.", "A code for each creator or partner, with usage tracked separately."],
+      ["influencers, embajadores, vendedores, afiliados y alianzas.", "influencers, ambassadors, sales teams, affiliates and partnerships."],
+      ["para medir los clientes que llegaron por María.", "to measure the customers referred by María."],
+      ["Programas de lealtad", "Loyalty programs"],
+      ["Cada compra o visita acerca al cliente a una recompensa.", "Every purchase or visit moves the customer closer to a reward."],
+      ["cafeterías, restaurantes, comercios y servicios frecuentes.", "coffee shops, restaurants, retailers and frequently used services."],
+      ["compra 10 cafés y recibe el próximo gratis.", "buy 10 coffees and get the next one free."],
+      ["Muestras, regalos y activaciones", "Samples, gifts and activations"],
+      ["Un QR registra una entrega, una cortesía o una interacción promocional.", "A QR code records a delivery, complimentary item or promotional interaction."],
+      ["marcas, distribuidores, degustaciones y activaciones.", "brands, distributors, product tastings and activations."],
+      ["un QR por local para revisar la actividad registrada.", "one QR code per location to review its recorded activity."],
+      ["Ayúdame a elegir", "Help me choose"],
+      ["WhatsApp incluido", "WhatsApp included"],
+      ["Tus clientes ya saben usarlo. Por eso empezamos ahí.", "Your customers already know how to use it. That is why we start there."],
+      ["Nadie quiere descargar otra aplicación para usar un cupón o consultar una recompensa. Con Soroticket, tus clientes pueden hacerlo desde una conversación que ya conocen.", "No one wants to download another app to use a coupon or check a reward. With Soroticket, your customers can do it from a conversation they already know."],
+      ["Lleva tu campaña al lugar donde tus clientes ya conversan", "Bring your campaign to the place where your customers already talk"],
+      ["Soroticket está preparado para conectar cupones, vouchers y programas de lealtad con una experiencia en WhatsApp. Diseñamos contigo el recorrido y definimos la integración necesaria para tu campaña.", "Soroticket is ready to connect coupons, vouchers and loyalty programs with a WhatsApp experience. We design the journey with you and define the integration your campaign needs."],
+      ["Abrir la conversación desde un enlace o un QR.", "Open the conversation from a link or QR code."],
+      ["Recibir o ingresar su código.", "Receive or enter their code."],
+      ["Consultar el beneficio o el avance de su recompensa.", "Check the reward or their progress toward it."],
+      ["Presentar o usar un voucher.", "Show or use a voucher."],
+      ["Recibir una confirmación clara al terminar.", "Receive a clear confirmation when finished."],
+      ["Cómo se siente para el cliente", "What the customer experience feels like"],
+      ["Escanea un QR o toca un enlace.", "Scan a QR code or tap a link."],
+      ["WhatsApp abre la conversación.", "WhatsApp opens the conversation."],
+      ["El bot le indica qué hacer.", "The bot explains what to do."],
+      ["Su beneficio queda listo para usar.", "Their reward is ready to use."],
+      ["Sin descargas. Sin cuentas nuevas. Sin instrucciones largas.", "No downloads. No new accounts. No lengthy instructions."],
+      ["Conversemos sobre la integración", "Let's talk about the integration"],
+      ["La experiencia puede adaptarse al tipo de campaña y al lenguaje de tu marca.", "The experience can adapt to your campaign type and your brand voice."],
+      ["De la idea al primer canje", "From the idea to the first redemption"],
+      ["Ponemos tu campaña en marcha en cuatro pasos", "We launch your campaign in four steps"],
+      ["Tú conoces a tus clientes. Nosotros te ayudamos a convertir ese conocimiento en una experiencia que funciona.", "You know your customers. We help turn that knowledge into an experience that works."],
+      ["PASO 01", "STEP 01"],
+      ["Cuéntanos qué quieres lograr", "Tell us what you want to achieve"],
+      ["Más visitas, más compras, clientes que regresen, una activación o una campaña con creadores.", "More visits, more purchases, returning customers, an activation or a creator campaign."],
+      ["PASO 02", "STEP 02"],
+      ["Definimos la mejor dinámica", "We define the right campaign"],
+      ["Elegimos juntos el tipo de cupón, voucher, ticket o programa y acordamos sus reglas.", "Together, we choose the right coupon, voucher, ticket or program and agree on its rules."],
+      ["PASO 03", "STEP 03"],
+      ["Lo configuramos y lo probamos", "We set it up and test it"],
+      ["Preparamos los códigos, el recorrido y los puntos donde tu equipo entrega o valida el beneficio.", "We prepare the codes, customer journey and the points where your team delivers or validates the reward."],
+      ["PASO 04", "STEP 04"],
+      ["Lanzamos y hacemos seguimiento", "We launch and track it"],
+      ["La campaña sale al público y puedes ver sus usos, avances y recompensas desde el panel.", "The campaign goes live and you can view usage, progress and rewards from the dashboard."],
+      ["De la idea al primer uso, con un alcance y un tiempo de puesta en marcha claros.", "From the idea to the first use, with a clear scope and launch timeline."],
+      ["Todo claro, en un mismo lugar", "Everything is clear, all in one place"],
+      ["Lo que pasa en tu campaña, sin adivinar", "Know what is happening in your campaign"],
+      ["Soroticket reúne la actividad de tus campañas para que puedas responder preguntas sencillas sin depender de hojas sueltas o reportes difíciles de entender.", "Soroticket brings your campaign activity together so you can answer simple questions without relying on scattered spreadsheets or hard-to-read reports."],
+      ["Datos claros para decidir qué repetir, qué ajustar y qué hacer después.", "Clear data to decide what to repeat, what to adjust and what to do next."],
+      ["Campaña · Visitas de verano", "Campaign · Summer visits"],
+      ["Usos registrados", "Recorded uses"],
+      ["Recompensas", "Rewards"],
+      ["Campañas activas", "Active campaigns"],
+      ["La tecnología trabaja por detrás", "Technology works behind the scenes"],
+      ["Para tus clientes es simple. Para tu empresa queda claro.", "Simple for your customers. Clear for your business."],
+      ["Cada uso registrado deja un historial que ayuda a mantener cuentas claras y a revisar lo ocurrido. Si más adelante necesitas conectar Soroticket con una tienda, un punto de venta u otra herramienta, definimos contigo la integración adecuada.", "Every recorded use creates a history that keeps the numbers clear and makes it easier to review what happened. If you later need to connect Soroticket to a store, point of sale or another tool, we will define the right integration with you."],
+      ["Cada código tiene reglas claras.", "Every code has clear rules."],
+      ["Cada uso queda registrado.", "Every use is recorded."],
+      ["Cada campaña puede revisarse desde un mismo lugar.", "Every campaign can be reviewed in one place."],
+      ["No tienes que entender la tecnología para aprovecharla.", "You do not need to understand the technology to benefit from it."],
+      ["Hecho para negocios que quieren crear una mejor razón para volver", "Built for businesses that want to give customers a better reason to return"],
+      ["Restaurantes y cafeterías", "Restaurants and coffee shops"],
+      ["Premia visitas frecuentes, entrega vouchers y crea promociones fáciles de usar.", "Reward frequent visits, deliver vouchers and create easy-to-use promotions."],
+      ["Tiendas y marcas", "Retailers and brands"],
+      ["Lanza descuentos, regalos, campañas con creadores y activaciones de producto.", "Launch discounts, gifts, creator campaigns and product activations."],
+      ["Organizadores de eventos", "Event organizers"],
+      ["Emite entradas únicas y valida cada acceso de forma sencilla.", "Issue unique tickets and validate each entry with ease."],
+      ["Equipos de marketing", "Marketing teams"],
+      ["Prueba campañas, sigue resultados y trabaja con aliados o referidos.", "Test campaigns, track results and work with partners or referrals."],
+      ["Distribuidores", "Distributors"],
+      ["Registra activaciones y entregas por punto, local o aliado.", "Track activations and deliveries by point, location or partner."],
+      ["Lo importante, antes de comenzar", "What matters before you begin"],
+      ["Si tu caso necesita algo diferente, lo revisamos contigo en la primera conversación.", "If your use case needs something different, we will review it with you in our first conversation."],
+      ["¿Necesito un equipo técnico para usar Soroticket?", "Do I need a technical team to use Soroticket?"],
+      ["No. Te acompañamos para definir y preparar la campaña. Si necesitas conectarla con otras herramientas de tu empresa, revisamos contigo la mejor forma de hacerlo.", "No. We guide you through defining and preparing the campaign. If it needs to connect to other business tools, we will review the best approach with you."],
+      ["¿Mis clientes tienen que descargar una aplicación?", "Do my customers need to download an app?"],
+      ["No. Pueden entrar desde un enlace o un QR y usar la experiencia a través de WhatsApp.", "No. They can enter through a link or QR code and use the experience through WhatsApp."],
+      ["¿Cuál es la diferencia entre un cupón y un voucher?", "What is the difference between a coupon and a voucher?"],
+      ["Un cupón suele compartir el mismo código entre muchas personas. Un voucher tiene un código único y normalmente se usa una sola vez.", "A coupon usually shares the same code among many people. A voucher has a unique code and is normally used only once."],
+      ["¿Qué tipo de campaña me conviene?", "Which type of campaign is right for me?"],
+      ["Depende de tu objetivo. Para alcance puede funcionar un cupón compartido; para controlar cada beneficio, un voucher único; y para impulsar visitas repetidas, un programa de lealtad.", "It depends on your goal. A shared coupon can work for reach, a unique voucher for controlling each reward, and a loyalty program for encouraging repeat visits."],
+      ["¿Puedo crear una campaña con creadores o referidos?", "Can I create a campaign with creators or referrals?"],
+      ["Sí. Puedes asignar un código a cada creador o aliado y consultar los usos registrados que corresponden a ese código.", "Yes. You can assign a code to each creator or partner and review the recorded uses associated with that code."],
+      ["¿Puedo comenzar con algo pequeño?", "Can I start small?"],
+      ["Sí. Puedes comenzar con una campaña concreta, aprender de sus resultados y ampliarla después.", "Yes. You can start with one focused campaign, learn from its results and expand it later."],
+      ["¿Puedo conectar Soroticket con mi tienda o sistema actual?", "Can I connect Soroticket to my store or current system?"],
+      ["Soroticket cuenta con herramientas de integración. Primero revisamos cómo trabaja hoy tu empresa y luego definimos la conexión que realmente necesitas.", "Soroticket includes integration tools. First, we review how your business works today and then define the connection you actually need."],
+      ["¿Cuánto tarda en estar lista una campaña?", "How long does it take to prepare a campaign?"],
+      ["Depende de la dinámica y de las conexiones necesarias. Después de conocer tu objetivo, te proponemos un alcance y un tiempo de puesta en marcha claros.", "It depends on the campaign and the connections it needs. Once we understand your goal, we will propose a clear scope and launch timeline."],
+      ["Tu próxima campaña puede comenzar con una conversación", "Your next campaign can begin with a conversation"],
+      ["Cuéntanos qué quieres lograr. Nosotros te ayudamos a ponerlo en marcha.", "Tell us what you want to achieve. We will help you launch it."],
+      ["No necesitas tener las reglas, los mensajes ni la parte técnica resueltos. Trae la idea y construimos contigo una experiencia sencilla para tu empresa y tus clientes.", "You do not need to have the rules, messages or technical details figured out. Bring the idea and we will build a simple experience for your business and customers with you."],
+      ["Quiero crear mi campaña", "I want to create my campaign"],
+      ["Resolver una duda primero", "Answer a question first"],
+      ["Cupones, vouchers, tickets, referidos y lealtad desde un mismo lugar · Preview privada sobre testnet.", "Coupons, vouchers, tickets, referrals and loyalty in one place · Private preview on testnet."],
+      ["Soroticket hace que crear, entregar y seguir un beneficio sea más sencillo.", "Soroticket makes creating, delivering and tracking a reward simpler."],
+      ["Soluciones", "Solutions"],
+      ["Empresa", "Company"],
+      ["Contacto", "Contact"],
+      ["Privacidad", "Privacy"],
+      ["Términos", "Terms"],
+      ["© 2026 Soroticket. Todos los derechos reservados.", "© 2026 Soroticket. All rights reserved."],
+      ["Diseñado para campañas más fáciles de lanzar y usar.", "Designed for campaigns that are easier to launch and use."],
+      ["Soroticket, inicio", "Soroticket, home"],
+      ["Navegación principal", "Main navigation"],
+      ["Abrir navegación", "Open navigation"],
+      ["Cerrar navegación", "Close navigation"],
+      ["Ejemplo de una conversación de Soroticket en WhatsApp", "Example Soroticket conversation on WhatsApp"],
+      ["Vista ilustrativa del panel de campaña", "Illustrative campaign dashboard"],
+      ["Idioma", "Language"]
+    ];
+
+    const seo = {
+      en: {
+        title: "Soroticket | Coupons, vouchers and loyalty through WhatsApp",
+        description: "We create and launch coupons, vouchers, tickets and loyalty programs for your business, with a simple experience through WhatsApp."
+      },
+      es: {
+        title: "Soroticket | Cupones, vouchers y lealtad por WhatsApp",
+        description: "Creamos y ponemos en marcha cupones, vouchers, tickets y programas de lealtad para tu empresa, con una experiencia sencilla desde WhatsApp."
+      }
+    };
+
+    const translationIndex = new Map();
+    translations.forEach(([es, en], index) => {
+      translationIndex.set(es, index);
+      translationIndex.set(en, index);
+    });
+
+    const textNodes = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (node.nodeValue.trim() && !["SCRIPT", "STYLE"].includes(node.parentElement?.tagName)) textNodes.push(node);
+    }
+    const translatedAttributes = [...document.querySelectorAll("[aria-label], [title], [placeholder]")]
+      .flatMap((element) => ["aria-label", "title", "placeholder"].filter((name) => element.hasAttribute(name)).map((name) => [element, name]));
+
+    let currentLanguage = "en";
+    const translatedValue = (value, language) => {
+      const key = value.trim();
+      const index = translationIndex.get(key);
+      if (index === undefined) return value;
+      const next = translations[index][language === "es" ? 0 : 1];
+      return value.replace(key, next);
+    };
+
+    const setLanguage = (language, updateUrl = true) => {
+      currentLanguage = language === "es" ? "es" : "en";
+      textNodes.forEach((node) => { node.nodeValue = translatedValue(node.nodeValue, currentLanguage); });
+      translatedAttributes.forEach(([element, name]) => element.setAttribute(name, translatedValue(element.getAttribute(name), currentLanguage)));
+      document.documentElement.lang = currentLanguage;
+      document.title = seo[currentLanguage].title;
+      document.querySelector('meta[name="description"]').setAttribute("content", seo[currentLanguage].description);
+      document.querySelectorAll("[data-language]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.language === currentLanguage)));
+      try { localStorage.setItem("soroticket-language", currentLanguage); } catch (error) { /* Storage may be unavailable. */ }
+
+      if (updateUrl) {
+        const url = new URL(window.location.href);
+        if (currentLanguage === "es") url.searchParams.set("lang", "es");
+        else url.searchParams.delete("lang");
+        history.replaceState({}, "", url);
+      }
+    };
+
+    const requestedLanguage = new URLSearchParams(window.location.search).get("lang");
+    let savedLanguage = null;
+    try { savedLanguage = localStorage.getItem("soroticket-language"); } catch (error) { /* Storage may be unavailable. */ }
+    setLanguage(requestedLanguage === "es" || requestedLanguage === "en" ? requestedLanguage : (savedLanguage === "es" ? "es" : "en"), false);
+    document.querySelectorAll("[data-language]").forEach((button) => button.addEventListener("click", () => setLanguage(button.dataset.language)));
+
+    const toggle = document.querySelector('.menu-toggle');
+    const nav = document.querySelector('.nav');
+    const closeMenu = () => {
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', currentLanguage === 'es' ? 'Abrir navegación' : 'Open navigation');
+      nav.classList.remove('open');
+      document.body.classList.remove('menu-open');
+    };
+
+    toggle.addEventListener('click', () => {
+      const open = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!open));
+      toggle.setAttribute('aria-label', open
+        ? (currentLanguage === 'es' ? 'Abrir navegación' : 'Open navigation')
+        : (currentLanguage === 'es' ? 'Cerrar navegación' : 'Close navigation'));
+      nav.classList.toggle('open', !open);
+      document.body.classList.toggle('menu-open', !open);
+    });
+    nav.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeMenu));
+    window.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMenu(); });
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.reveal').forEach((item) => observer.observe(item));
+  </script>
+</body>
+</html>

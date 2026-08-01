@@ -4,53 +4,79 @@ Orientation for any AI/dev session in this repo. **Read this before acting.**
 
 ## What Sorodeal is
 
-An **open, permissionless protocol/standard** for tokenized coupons, vouchers, and redeemable codes on **Stellar Soroban**, with verifiable attribution and optional automatic settlement (USDC payouts per conversion).
+An open protocol **and hosted preview suite** for tokenized coupons, vouchers,
+tickets and loyalty on Stellar Soroban. The repository contains the contract,
+Go/TypeScript SDKs, developer playground, Cloud API and Cloud console.
 
-It is a **public good / standard**, not a SaaS product. Think "like Stellar Disbursement Platform (SDP)" — a reference implementation others reuse. The intended path is a candidate **SEP (Stellar Ecosystem Proposal)** plus a milestone-funded **SCF** grant.
+The protocol can remain a public good while Cloud is an optional hosted product.
+Do not describe either preview environment as production or mainnet.
 
 ## Critical context (do not lose this)
 
 - **This repo is the home of the protocol.** It is NOT a feature of BotCore. BotCore was only the prototype where the code originated.
-- The `contracts/coupon-ledger/` contract and everything under `reference/botcore-donor/` are **donor/prototype code**, brought here to reuse the progress. They reflect the OLD design and must not be treated as the final spec.
-- The **real design target** lives in `docs/SPEC.md` and `docs/DECISIONS.md`. When in doubt, the spec wins over the donor code.
+- Everything under `reference/botcore-donor/` is archived donor/prototype code;
+  it is not part of the runtime or the current security boundary.
+- `contracts/coupon-ledger/` is the current candidate v0.2 source. The immutable
+  v0.1 testnet deployment is deprecated and remains the SDK default only until
+  an authorized v0.2 deployment exists.
+- The design target and its trust boundaries live in `docs/SPEC.md` and
+  `docs/DECISIONS.md`. The deployed address never overrides those warnings.
 
 ## Goals
 
-1. Publish Sorodeal as an open standard (candidate SEP) — reusable by anyone, not just the author.
-2. **Design partner:** the author's geolocated social network is the first real integration — dogfood + visibility. It uses the protocol; it does not own it.
-3. **Funding:** submit to the Stellar Community Fund (SCF) as a tranche/milestone-based grant. This repo lives under `hackathons/`, so a hackathon may be the launch/visibility vehicle.
+1. Publish reusable contract interfaces and SDKs as a candidate open standard.
+2. Offer a hosted integration path without making Cloud a protocol dependency.
+3. Reach the production gates in `docs/ROADMAP.md` before handling real value.
 
 ## The design in one screen
 
-- **One primitive, policy knobs.** The "three kinds of coupons" are one primitive varying on three axes: cardinality (code→redemptions: unique vs shared), attribution (is a redemption credited to a creator/referrer?), and per-user limits (once-per-user, geofence, time window).
+- **One primitive, current knobs.** The implemented axes are unique/shared
+  cardinality and optional fixed attribution. Per-user limits, geofence,
+  `valid_from`, transfers and refunds are product ideas, not guarantees.
 - **Spec nouns:** Campaign → Code → Redemption → Settlement.
 - **Two redemption profiles:**
   - **Burn (synchronous)** — unique tokens, 1 tx/redeem. Tickets, high-value vouchers. The donor contract already implements this.
-  - **Tally (asynchronous)** — shared codes, off-chain hot path + periodic on-chain commitment (counts + attribution, Merkle-anchored). Delivery promos, creator/referral codes. This is the new work.
-- **"Why Stellar" = attribution + settlement, NOT double-spend.** For shared codes there is no double-spend to prevent (they are meant to be reused many times). The real value is: trustless per-creator/referrer redemption counts + automatic USDC payout per conversion, viable only because Stellar fees are sub-cent and USDC is native.
+  - **Tally (asynchronous)** — shared codes, off-chain hot path + periodic
+    on-chain commitment (counts + attribution, Merkle-anchored). Implemented in
+    candidate v0.2; Cloud preview publishes signed receipt proofs on legacy v0.1.
+- **Why Stellar:** Burn prevents repeated use on-chain. Tally makes a published
+  aggregate immutable and v0.2 enforces exact configured attribution at
+  settlement. It does not prove that an off-chain sale occurred; the receipt
+  signer remains trusted for event truth.
+- **Settlement:** v0.2 supports permissionless triggering after the owner grants
+  the contract a token allowance. It is not a running automatic scheduler.
 - **Permissionless / ownership-based.** Each merchant/creator operates from their own Stellar account. NO global admin (the donor contract's `require_admin` single-ADMIN model is the #1 thing to redesign).
 
-## Production bar / known gaps to fix (carried from the prototype)
+## Security and release status
 
-1. **Permissionless redesign** of the contract: campaigns owned by their creator's `Address`; auth by campaign owner, not a global admin.
-2. ✅ **Done (`sdk/go`).** Replaced the `stellar` CLI shell-out with in-process signing over the Go Stellar SDK + Soroban RPC: simulate→assemble→sign→submit, retries, per-call sequence management, idempotent re-submission. E2E-validated.
-3. **PII on-chain:** the donor contract stores the redeemer's name in plaintext (`burned_by`). Hash with salt or omit.
-4. ✅ **Done (`sdk/go`).** Idempotent submission: the same signed envelope is re-sent on transient failures, so a network retry can't double-burn (the network dedups by tx hash).
-5. **Verify the deployed prototype address.** The donor pitch (`reference`/BotCore `PITCH_SOROBAN.md`) cited two inconsistent mainnet contract addresses — do not assert one as fact until verified.
+- Read `docs/SECURITY_AUDIT_2026-07-11.md` before changing release claims.
+- v0.2 is locally built and tested, **not deployed**. Never invent a contract ID,
+  transaction hash, receipt, metric, balance or payment destination.
+- Cloud TEST and internal `live`/public METERED both use Stellar testnet and the
+  deprecated v0.1 contract. METERED changes preview credits, not the network.
+- Signed receipts prove signer attestation and Merkle inclusion; they do not
+  independently prove a purchase.
+- Main production blockers include external audit, KMS/HSM, MFA/recovery,
+  chain/DB reconciliation, multi-instance coordination, schedulers and billing.
 
 ## Stack
 
 - **Contract:** Rust + Soroban SDK (`contracts/coupon-ledger/`). Build/test with the `stellar`/`soroban` CLI and `cargo test`.
-- **SDKs (built):** `sdk/ts` (`@sorodeal/sdk` — generated typed client + wrapper + low-level browser client) and `sdk/go` (`github.com/sorodeal/sorodeal-go` — in-process signing over Soroban RPC). Both validated by `tests/e2e/{ts,go}` (50 scenarios vs live testnet).
-- **Settlement (implemented):** token payout (SAC) per attributed redemption, keyed off committed tallies; immutable token+rate at registration. E2E-tested with a real native-XLM transfer.
+- **SDKs:** `sdk/ts` and `sdk/go`; their checked-in defaults are explicitly
+  legacy testnet until v0.2 is deployed.
+- **E2E apps:** historical consumer scenarios under `tests/e2e`; a compile or
+  prior run is not evidence that the current candidate was tested live.
+- **Settlement:** SAC payout is implemented locally in v0.2 and requires an
+  owner allowance. Do not claim a current network E2E without a recorded run.
 
 ## Docs
 
 - `docs/SPEC.md` — the protocol spec (the design target).
-- `docs/SCF.md` — the SCF tranche/milestone plan (M0–M3).
 - `docs/DECISIONS.md` — architecture decision records (the "why").
 
 ## Working agreements
 
 - Keep this standalone — do not re-entangle with BotCore, WhatsApp, Twilio, or multi-tenant SaaS concerns. Those were prototype scaffolding.
-- Treat the donor contract as a starting point to refactor, not gospel. Update `docs/SPEC.md` when decisions change, and add an ADR to `docs/DECISIONS.md`.
+- Treat `reference/` as historical context only. Update `docs/SPEC.md` when
+  protocol decisions change, and add an ADR to `docs/DECISIONS.md`.
+- Label product/UI capabilities `implemented`, `preview/testnet` or `planned`.
