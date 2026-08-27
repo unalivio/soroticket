@@ -99,6 +99,80 @@ soroticket/
 | `web/` | developer playground | integrators evaluating the protocol | the contract, directly |
 | `cloud/console/` | merchant portal | customers running campaigns | `cloud/api` |
 
+## Verify it yourself
+
+Every claim above is reproducible from a clean checkout. Requires Go 1.25+, Rust
+with the `wasm32v1-none` target, the [`stellar`](https://developers.stellar.org/docs/tools/developer-tools) CLI and Node 22.
+
+```bash
+# 1. The contract: 34 unit tests, including the settlement and attribution invariants
+cd contracts/coupon-ledger && cargo test
+
+# 2. Reproducible build — this hash IS the deployed contract
+stellar contract build
+shasum -a 256 target/wasm32v1-none/release/coupon_ledger.wasm
+# 1c6c74f2f43c60aa06939d6e63c49a1809c98a7cebd9555453a4297c5f04c94b
+# matches "wasmHash" in deployments/testnet-v0.2.0.json, which also carries the
+# upload and deploy transaction hashes you can look up on testnet.
+
+# 3. Cloud API: 36 tests, most of them regression tests for the audit findings
+cd cloud/api && go test ./... && go vet ./...
+
+# 4. SDKs and front-ends
+cd sdk/go && go test ./...
+cd sdk/ts && npm install && npm run build
+cd web && npm install && npm run build           # developer playground
+cd cloud/console && npm install && npm run build # merchant portal
+npm install && npm run build                     # public landing → dist/
+```
+
+To run Cloud locally: `cd cloud/api && go run .` serves `127.0.0.1:8787` and
+creates `./data/` on first start (SQLite, plus a generated key-encryption key).
+`cd cloud/console && npm run dev` points at it.
+
+Two honest caveats about the above. `cargo test` and `go test` are unit and
+integration tests against local state — they are not evidence of a live network
+run; those are in `tests/e2e/`, and a compile is not a run. And there is **no CI**,
+so nothing enforces that the commands above stay green between commits.
+
+## Documentation
+
+Read in this order:
+
+| Document | What it answers |
+|---|---|
+| [`docs/SPEC.md`](docs/SPEC.md) | What the protocol is — the design target, data model, and the trust boundary |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Why it is built this way — 18 ADRs, including the ones written in response to audit findings |
+| [`docs/SECURITY_AUDIT_2026-07-11.md`](docs/SECURITY_AUDIT_2026-07-11.md) | What was found and fixed — 20 findings with IDs, plus residual risks and the release criteria (Spanish) |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | What is done, what gates remain before real value |
+| [`docs/CLOUD.md`](docs/CLOUD.md) | The hosted API: endpoints, metering, receipts, and an explicit "not implemented" section |
+| [`docs/USE_CASES.md`](docs/USE_CASES.md) | Worked integration profiles, labeled implemented or planned |
+| [`docs/SEP.md`](docs/SEP.md) | The candidate Stellar Ecosystem Proposal draft |
+
+## What is not built yet
+
+Stated plainly, because the gap between a testnet preview and a payments product
+is the part worth being honest about. The full list is in `docs/ROADMAP.md`.
+
+- **No independent audit.** The 2026-07-11 review was internal and assisted. An
+  external audit is a release gate, not a formality.
+- **No CI**, and no provenance for build artifacts.
+- **Custodial keys** are encrypted with a local key-encryption key. KMS/HSM,
+  rotation and recovery runbooks are missing.
+- **Auth is incomplete** for production: no MFA, email verification, password
+  reset or account recovery.
+- **SQLite, single instance.** The chain-write/local-index boundary has no
+  durable outbox or reconciliation yet (ADR-017), and there are no distributed
+  locks for multiple instances.
+- **No billing.** Credits are a preview ledger; no money moves. Recharges are
+  disabled.
+- **No schedulers.** Tally commitment and TTL maintenance are triggered, not
+  automatic.
+- **Receipts prove attestation, not truth.** A signed receipt proves the signer
+  attested to an event and that it is included in a committed Merkle root. It
+  does not prove an off-chain sale happened. The signer is the trust anchor, and
+  that is a property of the design, not a bug to be fixed later.
+
 ## License
 
 [Apache-2.0](LICENSE) — a permissive license, to maximize ecosystem reuse as a public good. A candidate SEP draft lives in [`docs/SEP.md`](docs/SEP.md).
