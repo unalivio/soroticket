@@ -167,7 +167,7 @@ function Hero() {
             <div className="meta-row">
               <div className="meta-item">
                 <span className="k">Network</span>
-                <span className="net-pill" style={{ alignSelf: "flex-start" }}><span className="dot" />Testnet · legacy v0.1</span>
+                <span className="net-pill" style={{ alignSelf: "flex-start" }}><span className="dot" />Testnet · v0.2.0</span>
               </div>
               <div className="meta-item">
                 <span className="k">Contract</span>

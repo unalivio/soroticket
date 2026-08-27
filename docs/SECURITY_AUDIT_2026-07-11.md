@@ -1,4 +1,8 @@
-# Revisión de seguridad y diseño — Sorodeal
+# Revisión de seguridad y diseño — Soroticket
+
+> El proyecto se llamaba **Sorodeal** cuando se hizo esta revisión; se renombró a
+> Soroticket el 2026-07-25 (ADR-006). Las rutas y nombres de archivo citados abajo
+> son los de esa fecha.
 
 Fecha de inicio: 2026-07-11  
 Cierre de validación: 2026-07-12  
@@ -274,9 +278,15 @@ detallan abajo.
    durable/reconciliación antes de cobrar dinero.
 9. **Auditoría pública futura multi-red.** La ruta usa `chain_id/code/period`;
    antes de mainnet debe incluir contract/network para evitar ambigüedad.
-10. **Artefacto binario versionado.** `cloud/api/sorodeal-cloud` es un build
-    grande rastreado por Git; debe eliminarse del historial/árbol y generarse en
-    CI con provenance, previa decisión del maintainer.
+10. **Artefacto binario versionado.** *(árbol corregido 2026-08-27; historial
+    pendiente.)* `cloud/api/sorodeal-cloud` era un build grande rastreado por Git.
+    Se dejó de versionar, pero el mismo error reapareció en
+    `cloud/scanner/soroticket-scanner` porque ese módulo no tenía `.gitignore`
+    propio. El 2026-08-27 se quitó del árbol y se añadieron reglas en
+    `cloud/scanner/.gitignore` y en el `.gitignore` raíz. **Sigue abierto:** los
+    blobs viven en el historial de `main` (~79 MB, lo que descarga cualquier
+    clon); eliminarlos exige reescribir el historial y un force-push, decisión
+    del maintainer. Falta también generarlos en CI con provenance.
 11. **Allowance SAC compartida por owner/token en v0.2.** No queda aislada por
     campaña. Si el owner aprueba un monto agregado, terceros pueden decidir qué
     obligación ya comprometida se liquida primero y agotar la allowance para

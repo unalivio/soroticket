@@ -4,7 +4,19 @@
 
 Soroticket combines a permissionless contract, Go/TypeScript SDKs, a developer playground and a hosted Cloud API. Burn redemptions are recorded individually on-chain; high-volume shared-code events stay off-chain as signed receipts and are periodically anchored by a Merkle root. Attributed tallies may pay a configured Stellar asset.
 
-> **Security status (2026-07-11):** the immutable testnet v0.1 deployment is deprecated because it permits creator underpayment and requires owner-authorized settlement. Contract v0.2 is built and tested locally, but **has not been deployed**. Cloud's TEST/METERED previews still use legacy v0.1 and neither environment is production or mainnet. See `deployments/` and `docs/SECURITY_AUDIT_2026-07-11.md`.
+> **Status:** contract **v0.2.0 is deployed to testnet** (2026-07-12) at
+> `CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF` — the SDKs, Cloud
+> and playground all point at it; see `deployments/testnet-v0.2.0.json` for the
+> upload/deploy transaction hashes. The earlier v0.1 testnet deployment is
+> **deprecated** (it permitted creator underpayment and required an owner
+> signature to settle) and is immutable, so it stays readable but unused.
+>
+> This is a **testnet preview under active development**, not production and not
+> mainnet: Cloud TEST is free and METERED exercises the credit ledger, but both
+> run on testnet and neither moves real value. The 2026-07-11 review was internal
+> and assisted — an independent audit is still an open release gate. Findings,
+> residual risks and the release criteria are in
+> `docs/SECURITY_AUDIT_2026-07-11.md`; the remaining gates are in `docs/ROADMAP.md`.
 
 ## Why this exists
 

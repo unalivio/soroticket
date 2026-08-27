@@ -16,10 +16,28 @@ secrets/
 .idea/
 .vscode/
 
-# Design/product sources kept out of the repo (deliberate)
+# Product, pitch and funding sources kept out of the repo (deliberate).
+# These live outside the working tree; the patterns are a second line of defence
+# so a stray `git add -A` cannot publish them.
 *.pdf
+*.docx
+*.pptx
+~$*
+/deliverables/
+/build/
+/.tmp/
 
 # Root landing build and Cloudflare tooling
 /node_modules/
 /dist/
 /.wrangler/
+
+# design-sync (claude.ai/design) — staged scripts, build output, machine state
+.ds-sync/
+ds-bundle/
+.design-sync/
+
+# Compiled Go binaries (built per-platform, generated on deploy — never committed).
+# Each module also ignores its own binary by name; see cloud/*/.gitignore.
+/cloud/api/soroticket-cloud
+/cloud/scanner/soroticket-scanner

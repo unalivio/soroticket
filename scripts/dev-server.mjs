@@ -19,7 +19,7 @@ const contentTypes = {
 
 const server = createServer((request, response) => {
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host || host}`);
-  const pathname = requestUrl.pathname === "/" ? "/sorodeal-index.html" : requestUrl.pathname;
+  const pathname = requestUrl.pathname === "/" ? "/soroticket-index.html" : requestUrl.pathname;
   const decodedPath = decodeURIComponent(pathname);
   const filePath = resolve(projectRoot, `.${decodedPath}`);
 

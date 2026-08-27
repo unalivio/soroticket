@@ -1,15 +1,16 @@
-# Claude Design prompt — Sorodeal Console
+# Claude Design prompt — Soroticket Console
 
 > Archived design input. The implemented console is the source of truth; this
 > prompt contains aspirational flows and must not be used as a feature-status
 > document.
 
 > Paste everything below the line into Claude Design, giving it this whole
-> repository as context.
+> repository as context. The generated export that accompanied this prompt was
+> removed on 2026-08-27; `cloud/console/` is the implementation.
 
 ---
 
-You have the full Sorodeal repository. Ground the design in these files —
+You have the full Soroticket repository. Ground the design in these files —
 read them before designing:
 
 - `docs/CLOUD.md` — the hosted-platform/API spec. **Source of truth** for
@@ -22,8 +23,8 @@ read them before designing:
   carry over. `web/src/data.js` shows the tone of sample data and copy.
 - Ignore `reference/botcore-donor/` (legacy prototype) and `tests/`.
 
-Design **Sorodeal Console** — the self-service web app for Sorodeal Cloud, the
-hosted platform of the Sorodeal protocol (open standard for coupons, vouchers,
+Design **Soroticket Console** — the self-service web app for Soroticket Cloud, the
+hosted platform of the Soroticket protocol (open standard for coupons, vouchers,
 event tickets and loyalty programs on Stellar Soroban, with signed audit
 receipts and allowance-based token settlement).
 
@@ -52,7 +53,7 @@ Two redemption engines surface in the UI as plain language: unique codes
 Never say "Burn profile" or "Tally profile" in UI copy — say "unique codes"
 and "shared codes".
 
-## Brand — continuity with the existing Sorodeal playground (attached CSS)
+## Brand — continuity with the existing Soroticket playground (attached CSS)
 
 - **Editorial, paper-like, warm.** Background `#FBFBF8`, surfaces `#FFFFFF` /
   `#F2F2EE`, ink `#0C0D0E` (secondary `#5B5C5E`, tertiary `#8C8D8F`),
@@ -148,7 +149,7 @@ tally.committed, settlement.paid, loyalty.reward_issued, credits.low), signing
 secret reveal, recent deliveries log with replay.
 
 **10 · Settings.** Org name; custodial account card (address mono + QR +
-stellar.expert link + explainer "Sorodeal holds this key for you — export
+stellar.expert link + explainer "Soroticket holds this key for you — export
 coming later"); danger zone (delete org).
 
 ## States to design explicitly

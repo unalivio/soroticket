@@ -218,7 +218,7 @@ function TallySettle() {
 
   return (
     <ActionCard num="08" id="tally-settle" label="Audit & settle" title="Audit & settle" auth="public"
-      desc="Read a committed tally and preview payouts. Verifying the root requires the signed receipt set and inclusion proofs; the signer remains the trust anchor for genuine off-chain events. This legacy v0.1 playground still requires the owner to settle."
+      desc="Read a committed tally and preview payouts. Verifying the root requires the signed receipt set and inclusion proofs; the signer remains the trust anchor for genuine off-chain events. On v0.2 settlement is permissionless once the owner has approved a token allowance."
       snippets={snippets}>
       <div className="form-grid">
         <div className="field">

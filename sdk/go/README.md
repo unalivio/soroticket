@@ -23,7 +23,7 @@ go get github.com/soroticket/soroticket-go
 ## Read (no signer)
 
 ```go
-c, _ := soroticket.New(soroticket.Config{}) // legacy v0.1 testnet compatibility
+c, _ := soroticket.New(soroticket.Config{}) // defaults to the v0.2 testnet deployment
 defer c.Close()
 
 camp, _ := c.GetCampaign(ctx, 1)

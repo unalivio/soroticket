@@ -1,8 +1,8 @@
-# CLAUDE.md — Sorodeal
+# CLAUDE.md — Soroticket
 
 Orientation for any AI/dev session in this repo. **Read this before acting.**
 
-## What Sorodeal is
+## What Soroticket is
 
 An open protocol **and hosted preview suite** for tokenized coupons, vouchers,
 tickets and loyalty on Stellar Soroban. The repository contains the contract,
@@ -38,7 +38,7 @@ Do not describe either preview environment as production or mainnet.
   - **Burn (synchronous)** — unique tokens, 1 tx/redeem. Tickets, high-value vouchers. The donor contract already implements this.
   - **Tally (asynchronous)** — shared codes, off-chain hot path + periodic
     on-chain commitment (counts + attribution, Merkle-anchored). Implemented in
-    candidate v0.2; Cloud preview publishes signed receipt proofs on legacy v0.1.
+    v0.2, which Cloud preview runs against; Cloud publishes signed receipt proofs.
 - **Why Stellar:** Burn prevents repeated use on-chain. Tally makes a published
   aggregate immutable and v0.2 enforces exact configured attribution at
   settlement. It does not prove that an off-chain sale occurred; the receipt
@@ -50,10 +50,13 @@ Do not describe either preview environment as production or mainnet.
 ## Security and release status
 
 - Read `docs/SECURITY_AUDIT_2026-07-11.md` before changing release claims.
-- v0.2 is locally built and tested, **not deployed**. Never invent a contract ID,
-  transaction hash, receipt, metric, balance or payment destination.
+- v0.2.0 is **deployed to testnet** (2026-07-12,
+  `CCXNPRC4C2DX2W7Z2AW35NC6WORZPTI5JWJCTQIVRJ2FLMI3ZZ32MKRF`); the record with
+  real transaction hashes is `deployments/testnet-v0.2.0.json`. Never invent a
+  contract ID, transaction hash, receipt, metric, balance or payment destination.
 - Cloud TEST and internal `live`/public METERED both use Stellar testnet and the
-  deprecated v0.1 contract. METERED changes preview credits, not the network.
+  v0.2 contract. METERED changes preview credits, not the network. The v0.1
+  contract is deprecated and kept only for backward compatibility.
 - Signed receipts prove signer attestation and Merkle inclusion; they do not
   independently prove a purchase.
 - Main production blockers include external audit, KMS/HSM, MFA/recovery,

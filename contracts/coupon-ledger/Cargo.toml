@@ -3,7 +3,7 @@ name = "coupon-ledger"
 version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "Sorodeal — permissionless tokenized coupons / redeemable codes on Soroban (Burn + Tally profiles)"
+description = "Soroticket — permissionless tokenized coupons / redeemable codes on Soroban (Burn + Tally profiles)"
 
 [lib]
 crate-type = ["cdylib"]

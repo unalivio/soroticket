@@ -9,7 +9,7 @@ await rm(output, { recursive: true, force: true });
 await mkdir(resolve(output, "assets"), { recursive: true });
 
 await copyFile(
-  resolve(root, "sorodeal-index.html"),
+  resolve(root, "soroticket-index.html"),
   resolve(output, "index.html"),
 );
 await cp(

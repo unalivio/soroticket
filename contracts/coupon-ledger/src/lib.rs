@@ -2,7 +2,7 @@
 // Soroban entry points legitimately take many typed parameters (env + args).
 #![allow(clippy::too_many_arguments)]
 
-//! Sorodeal coupon-ledger — Burn profile (permissionless).
+//! Soroticket coupon-ledger — Burn profile (permissionless).
 //!
 //! Implements the synchronous **Burn** redemption profile from `docs/SPEC.md`
 //! §3.1: unique single-use codes, one on-chain tx per redemption, with

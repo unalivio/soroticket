@@ -1,10 +1,10 @@
-# Architecture Decision Records — Sorodeal
+# Architecture Decision Records — Soroticket
 
 Short ADRs capturing the "why." Newest decisions append at the bottom.
 
 ---
 
-## ADR-001 — Sorodeal is a standalone protocol, not a BotCore feature
+## ADR-001 — Soroticket is a standalone protocol, not a BotCore feature
 **Context:** A working coupon system was prototyped inside BotCore (a WhatsApp sales-bot platform). The valuable part is the on-chain redemption primitive, not the WhatsApp/Twilio/SaaS scaffolding around it.
 **Decision:** Extract it into its own repo as an open protocol. BotCore is the *donor* of code only.
 **Consequences:** Drop multi-tenant SaaS, white-label, and WhatsApp concerns. The home of the design is this repo's `docs/`, not BotCore.
@@ -29,10 +29,10 @@ Short ADRs capturing the "why." Newest decisions append at the bottom.
 **Decision:** On-chain = campaign terms, supply commitments, redemption *commitments* (hashed/Merkle), attribution counts, settlement events — the source of truth for what was committed. Off-chain = the fast path, plaintext PII, rich metadata and signed receipts, periodically anchored.
 **Consequences:** Redeemer identity on-chain is always a commitment/hash, never plaintext PII. The donor contract's plaintext `burned_by` is a bug to fix.
 
-## ADR-006 — Name: Sorodeal
+## ADR-006 — Name: Soroticket (superseding Sorodeal)
 **Context:** Needed a name for the protocol/repo. Candidates floated: Tessera, Canje, Sello, Stub.
-**Decision:** **Sorodeal** (Soroban + deal).
-**Consequences:** Repo, package, and SEP naming follow. Still pursue a candidate SEP for "standard" legitimacy regardless of brand name.
+**Decision:** Originally **Sorodeal** (Soroban + deal). Renamed to **Soroticket** on 2026-07-25 once tickets and proof-of-delivery — not discount "deals" — turned out to be the driving use cases (`docs/USE_CASES.md`).
+**Consequences:** Repo, packages, Go module paths, services and SEP naming follow the new name. Two classes of literal deliberately keep the old string because changing them would change computed values or misrepresent history: the loyalty commitment domain `sorodeal-loyalty|…` in `cloud/api/merkle.go`, which must keep reproducing hashes already written to disk, and the pre-fix salt quoted in ADR-010. Still pursue a candidate SEP for "standard" legitimacy regardless of brand name.
 
 ## ADR-007 — Authorization granularity: owner-only issuance, owner-or-delegate redemption
 **Context:** ADR-002 makes campaigns owner-authorized "with explicit delegates" but does not say which operations a delegate may perform. Issuing codes creates value and changes the supply cap; redemption is the routine act done "at the door" (POS staff, many devices).
@@ -87,7 +87,7 @@ product copy calling settlement automatic. The external token call occurred
 before the settled guard was persisted.
 
 **Decision:** For an attributed shared code, the only attribution entry must
-equal the total `count` exactly. The owner pre-approves the Sorodeal contract as
+equal the total `count` exactly. The owner pre-approves the Soroticket contract as
 a standard token spender for a bounded amount/expiration; any fee payer may
 then call `settle`. Settlement checks balance/allowance, records its guard before
 `transfer_from`, relies on transaction rollback on failure, and exposes public
@@ -119,7 +119,7 @@ and scheduler; the contract cannot discover every code/delegate itself.
 
 ### TODO / unresolved
 - The donor prototype's alleged mainnet addresses are obsolete and must never be
-  presented as Sorodeal deployments. Mainnet is not enabled.
+  presented as Soroticket deployments. Mainnet is not enabled.
 - ~~Choose a license~~ → **Apache-2.0** (see `LICENSE`).
 - SEP: drafted in `docs/SEP.md` (core + Tally + settlement as one standard). Open: confirm whether settlement should be split into a companion proposal before submission.
 

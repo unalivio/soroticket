@@ -144,7 +144,7 @@ function Footer() {
             <div className="brand" style={{ marginBottom: 12 }}>
               <span className="mark"><Logo className="logo" /><span className="word">Soroticket</span></span>
             </div>
-            <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.55 }}>The open coupon protocol on Stellar — legacy v0.1 testnet preview.</p>
+            <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.55 }}>The open coupon protocol on Stellar — v0.2.0 testnet preview.</p>
           </div>
           <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
