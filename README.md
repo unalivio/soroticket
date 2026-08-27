@@ -18,6 +18,15 @@ Soroticket combines a permissionless contract, Go/TypeScript SDKs, a developer p
 > residual risks and the release criteria are in
 > `docs/SECURITY_AUDIT_2026-07-11.md`; the remaining gates are in `docs/ROADMAP.md`.
 
+> **Formerly Sorodeal.** The project started under that name and was renamed on
+> 2026-07-25, once tickets and proof-of-delivery — not discount "deals" — turned
+> out to be the driving use cases (ADR-006 in `docs/DECISIONS.md`). A few
+> identifiers deliberately keep the old string: the `sorodeal-loyalty` hash
+> domain in `cloud/api/merkle.go` reproduces commitments already written to disk
+> and must never change, and `docs/DECISIONS.md` / `docs/SECURITY_AUDIT_2026-07-11.md`
+> quote it where they record history. A local checkout may also still sit in a
+> folder named `sorodeal`; nothing in the code depends on the directory name.
+
 ## Why this exists
 
 Coupons today are either paper (forgeable, unauditable) or locked inside closed SaaS platforms. There is no open standard where:
