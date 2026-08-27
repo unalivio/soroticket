@@ -61,31 +61,43 @@ Spec nouns: **Campaign → Code → Redemption → Settlement.**
 
 ## Repo layout
 
+A monorepo by layout, not by tooling: every unit below builds on its own (four Go
+modules, six npm packages, one Rust crate) and there is no workspace file, no
+Makefile and no CI. Nothing here is published as a package yet.
+
 ```
 soroticket/
-├── README.md
-├── CLAUDE.md                 # orientation for AI sessions — read this first
-├── contracts/
-│   └── coupon-ledger/        # reference Soroban contract — permissionless Burn + Tally profiles (ADR-002/005/011)
-│       ├── src/lib.rs
-│       ├── Cargo.toml
-│       └── test_snapshots/
-├── docs/
-│   ├── SPEC.md               # the protocol spec (the real design target)
-│   └── DECISIONS.md          # architecture decision records
-├── deployments/              # on-chain deployment records (testnet.json)
+├── contracts/coupon-ledger/   # THE PROTOCOL — reference Soroban contract, Rust
+│                              # Burn + Tally profiles (ADR-002/005/011). v0.2.0 on testnet.
 ├── sdk/
-│   ├── ts/                   # @soroticket/sdk — typed client (generated) + ergonomic wrapper + browser client
-│   └── go/                   # github.com/soroticket/soroticket-go — in-process signing over Soroban RPC
-├── tests/
-│   └── e2e/                  # consumer tester apps; historical scenarios target legacy testnet v0.1
-├── web/                      # developer playground — Vite/React + Freighter (consumes @soroticket/sdk)
-└── reference/
-    └── botcore-donor/        # reference-only Go from the prototype (does NOT build standalone)
-        ├── stellar-adapter/  # how the contract was invoked (CLI shell-out — superseded by sdk/go)
-        ├── domain/           # data model: code generation, QR payload, reference numbers
-        └── port/             # interface sketches
+│   ├── go/                    # github.com/soroticket/soroticket-go — in-process signing over Soroban RPC
+│   └── ts/                    # @soroticket/sdk — generated typed client + ergonomic + browser wrapper
+│
+├── cloud/                     # THE HOSTED PRODUCT — optional, never a protocol dependency (ADR-016)
+│   ├── api/                   # Go REST API: custodial org accounts, credits, receipts, settlement
+│   ├── console/               # merchant portal (React) — campaigns, scans, redemptions, settlements
+│   └── scanner/               # WhatsApp webhook: QR scan → redemption, with location evidence
+│
+├── web/                       # developer playground (Vite/React + Freighter) — talks to the
+│                              # contract directly via @soroticket/sdk, no Cloud involved
+├── soroticket-index.html      # public landing; `npm run build` → dist/ → Cloudflare (wrangler.jsonc)
+├── scripts/                   # landing dev server + build
+├── assets/soroticket/         # brand assets and fonts for the landing
+│
+├── docs/                      # SPEC (design target), DECISIONS (ADRs), SECURITY_AUDIT, ROADMAP, SEP,
+│                              # CLOUD, USE_CASES, PRODUCT_OPPORTUNITIES, LANDING_COPY_ES
+├── deployments/               # on-chain deployment records with real transaction hashes
+├── tests/e2e/                 # consumer tester apps (Go, TS, and the gift/proof-of-delivery demo)
+└── reference/botcore-donor/   # archived prototype Go — reference only, does NOT build standalone
 ```
+
+**Three separate web surfaces**, often confused for one:
+
+| Surface | What it is | Who it serves | Talks to |
+|---|---|---|---|
+| `soroticket-index.html` | static multilingual landing | the public | nothing |
+| `web/` | developer playground | integrators evaluating the protocol | the contract, directly |
+| `cloud/console/` | merchant portal | customers running campaigns | `cloud/api` |
 
 ## License
 
